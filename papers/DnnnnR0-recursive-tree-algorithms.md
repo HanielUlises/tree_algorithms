@@ -492,9 +492,9 @@ The elementwise fold proposed here and the effectful traversal proposed there ar
 There is no normative dependence in either direction; persistent tree structures are simply one more recursive representation the algorithms here can serve.
 The fringe tree in this paper's reference implementation — a cached measure maintained through its embedding — is the miniature of Paper C's monoid-tagged-structure idea, and the shared `Monoid` vocabulary (`identity`/`combine`) is kept aligned across the coordinated set.
 
-**Monad, deliberately absent**: no paper in the coordinated set proposes a Monad abstraction.
-C++ already spells monadic composition as members (`and_then`/`or_else`/`transform` on `optional` and `expected`, `let_value` on senders), and the motivating domains of the set compose *independent* computations, which is precisely what `bind`'s sequential dependence does not express.
-The rationale is stated once, citably, in P3200 and a companion essay covering the coordinated set's shape; this paper only records that the omission is a decision, not an oversight.
+**Monad, deferred**: no paper in the coordinated set proposes a Monad abstraction — deferred, not rejected.
+The typeclass design points toward a consistent generic name for sequential composition eventually (today's `and_then`/`transform`/`let_value` are per-type members, not generic), and the mechanism demonstrably carries it; it is simply not needed by anything proposed — the verbs here fold and build, and the traversal paper composes independent contexts.
+The rationale is stated once, citably, in P3200's "Why not Monad"; this paper records only that the omission is a decision.
 
 **What remains valid if companion papers do not progress**: the entire primary API.
 Only the lookup-based convenience overloads are contingent on P3200's facility.
