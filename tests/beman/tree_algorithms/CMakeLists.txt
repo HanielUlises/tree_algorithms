@@ -148,9 +148,16 @@ if(BEMAN_TREE_ALGORITHMS_USE_MODULES)
 endif()
 
 # The fetch-content dependency provider makes Catch2 available inside a
-# function scope, so its extras/ directory never reaches CMAKE_MODULE_PATH.
-if(catch2_SOURCE_DIR)
-    list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
+# function scope, so its extras/ directory never reaches CMAKE_MODULE_PATH
+# and catch2_SOURCE_DIR is not visible here; recover it from FetchContent's
+# global properties. (The vcpkg path needs neither: Catch2's installed
+# config puts Catch.cmake on the module path itself.)
+if(NOT COMMAND catch_discover_tests)
+    include(FetchContent)
+    FetchContent_GetProperties(catch2)
+    if(catch2_SOURCE_DIR)
+        list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
+    endif()
 endif()
 include(Catch)
 catch_discover_tests(beman.tree_algorithms.tests.todo)
