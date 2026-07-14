@@ -19,6 +19,7 @@ using beman::tree_algorithms::BinaryTreeFix;
 using beman::tree_algorithms::BinaryTreeLayer;
 using beman::tree_algorithms::Box;
 using beman::tree_algorithms::fold_fix;
+using beman::tree_algorithms::fold_with;
 using beman::tree_algorithms::from_fix;
 using beman::tree_algorithms::functor_typeclass;
 using beman::tree_algorithms::has_functor_instance;
@@ -238,6 +239,32 @@ TEST_CASE("BinaryTree - RefoldMatchesFoldOfUnfold", "[tree_algorithms::binary_tr
         CHECK(refold<std::string, BinaryTreeLayer<int>::F>(show_algebra, bst_coalgebra, fmap_btree_fn, seed) ==
               materialized);
     }
+}
+
+TEST_CASE("BinaryTree - DirectFoldAgreesWithAdapterPath", "[tree_algorithms::binary_tree]") {
+    // The same tree object, two routes to the same answer: convert with
+    // to_fix and fold with fold_fix, or fold_with directly through a
+    // projection that reads the shared_ptr children in place — no
+    // conversion, no structure copied beyond one layer at a time. The
+    // projection deals in raw non-owning pointers; the same BinaryTreeF
+    // layer and the same fmap serve both routes.
+    using Ptr    = const IntTree*;
+    auto project = [](Ptr t) -> BinaryTreeF<int, Ptr> {
+        return BinaryTreeF<int, Ptr>{t->value(),
+                                     t->has_left() ? make_box<Ptr>(&t->left()) : Box<Ptr>{},
+                                     t->has_right() ? make_box<Ptr>(&t->right()) : Box<Ptr>{}};
+    };
+
+    auto t = IntTree::node(1, IntTree::node(2, IntTree::leaf(4), IntTree::leaf(5)), IntTree::leaf(3));
+
+    auto direct  = fold_with<std::string>(show_algebra, fmap_btree_fn, project, static_cast<Ptr>(&t));
+    auto adapted = fold_fix<std::string>(show_algebra, to_fix(t));
+    CHECK(direct == adapted);
+    CHECK(direct == "((4 2 5) 1 3)");
+
+    // Non-commutative numeric agreement on the same structure.
+    CHECK(fold_with<int>(subtract_algebra, fmap_btree_fn, project, static_cast<Ptr>(&t)) ==
+          fold_fix<int>(subtract_algebra, to_fix(t)));
 }
 
 TEST_CASE("BinaryTree - FmapPreservesAbsentChildrenAndValue", "[tree_algorithms::binary_tree]") {

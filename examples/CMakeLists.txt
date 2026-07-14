@@ -5,6 +5,7 @@ set(ALL_EXAMPLES
     fixpoint_tree_example
     expression_algorithms
     binary_tree_adapt
+    nonce_tree_direct
 )
 message("Examples to be built: ${ALL_EXAMPLES}")
 

@@ -86,6 +86,67 @@ constexpr auto refold(const Algebra& algebra, const Coalgebra& coalgebra, const 
     return algebra(evaluated);
 }
 
+// The direct verbs: fold and build over a tree in its own representation,
+// with no Fix<F> and no conversion. The extra ingredient is supplied
+// explicitly — a projection exposing one layer of the user's tree as a
+// base-functor value, or its dual, an embedding rebuilding one layer of
+// the user's tree from a completed base-functor layer.
+//
+// fold_with(algebra, fmap_fn, project, tree) is refold with project as
+// the coalgebra; unfold_with(coalgebra, fmap_fn, embed, seed) is refold
+// with embed as the algebra. fold_fix is the degenerate case where
+// project is unwrap_fix. The child handles inside a projected layer need
+// not be the tree type itself — a projection may hand out pointers or
+// other cheap handles, and the recursion follows whatever project accepts.
+
+/** Recursive fold over a tree in its own representation.
+ *
+ * Projects one layer of @p tree with @p project, recursively folds every
+ * child handle in that layer via @p fmap_fn, then combines the fully
+ * evaluated layer with @p algebra. Equivalent to
+ * refold(algebra, project, fmap_fn, tree); no Fix is materialized.
+ * @tparam Result the fold carrier; must be given explicitly
+ * @param algebra  callable F<Result> -> Result
+ * @param fmap_fn  callable (Fn, const F<A>&) -> F<B> — the layer's fmap
+ * @param project  callable Tree -> F<Handle>, one layer, children as
+ *                 handles that @p project itself accepts
+ * @param tree     the tree (or child handle) to fold
+ */
+// 6c596985-e990-4808-a504-2b651c34cebc
+template <typename Result, typename Algebra, typename FMap, typename Project, typename Tree>
+constexpr auto fold_with(const Algebra& algebra, const FMap& fmap_fn, const Project& project, const Tree& tree)
+    -> Result {
+    auto layer     = project(tree);
+    auto evaluated = fmap_fn(
+        [&](const auto& child) -> Result { return fold_with<Result>(algebra, fmap_fn, project, child); }, layer);
+    return algebra(evaluated);
+}
+// 6c596985-e990-4808-a504-2b651c34cebc end
+
+/** Recursive build into a tree's own representation.
+ *
+ * Expands @p seed one layer with @p coalgebra, recursively unfolds every
+ * child seed via @p fmap_fn, then rebuilds one layer of the target
+ * representation with @p embed. Equivalent to
+ * refold(embed, coalgebra, fmap_fn, seed); no Fix is materialized.
+ * @tparam Tree the build carrier (the user's tree type); must be given
+ *              explicitly
+ * @param coalgebra callable Seed -> F<Seed>
+ * @param fmap_fn   callable (Fn, const F<A>&) -> F<B> — the layer's fmap
+ * @param embed     callable F<Tree> -> Tree, rebuilding one layer
+ * @param seed      the starting seed
+ */
+// d160af7b-9a3c-4593-b8f5-fc1ff0404b37
+template <typename Tree, typename Coalgebra, typename FMap, typename Embed, typename Seed>
+constexpr auto unfold_with(const Coalgebra& coalgebra, const FMap& fmap_fn, const Embed& embed, const Seed& seed)
+    -> Tree {
+    auto layer    = coalgebra(seed);
+    auto expanded = fmap_fn(
+        [&](const auto& child) -> Tree { return unfold_with<Tree>(coalgebra, fmap_fn, embed, child); }, layer);
+    return embed(std::move(expanded));
+}
+// d160af7b-9a3c-4593-b8f5-fc1ff0404b37 end
+
 } // namespace beman::tree_algorithms
 
 #endif // BEMAN_TREE_ALGORITHMS_USE_MODULES() &&
