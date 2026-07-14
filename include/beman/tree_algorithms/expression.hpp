@@ -13,6 +13,7 @@ import beman.tree_algorithms;
 
     #include <beman/tree_algorithms/box.hpp>
     #include <beman/tree_algorithms/fix.hpp>
+    #include <beman/tree_algorithms/fold_map_lookup.hpp>
     #include <beman/tree_algorithms/functor.hpp>
     #include <beman/tree_algorithms/overloaded.hpp>
     #include <beman/tree_algorithms/recursion_schemes_lookup.hpp>
@@ -147,6 +148,41 @@ inline constexpr auto eval_algebra = [](const ExprF<int>& expr) -> int {
                       expr);
 };
 // bbf73c10-b63e-434a-91f1-d1a3a7c23b96 end
+
+// ---------------------------------------------------------------------
+// Elementwise layer fold (for fold_map).
+// ---------------------------------------------------------------------
+
+// 8f25579d-443a-4685-b3af-01f8103f6863
+/** Folds one ExprF layer elementwise: the elements of an expression tree
+ * are the constants, so Const maps its value and Add/Mul just combine
+ * their children's results. Note the contrast with eval_algebra: an
+ * elementwise fold sees the constants through one combine, where
+ * evaluation interprets each alternative — summing the constants of
+ * (1 + 2) * 3 gives 6, evaluating it gives 9. ExprF has no empty
+ * alternative, so the identity goes unused.
+ */
+struct ExprLayerFoldMap {
+    template <typename MapFn, typename Combine, typename Result>
+    constexpr auto operator()(const MapFn&         map_fn,
+                              const Combine&       combine,
+                              const Result&        /*identity*/,
+                              const ExprF<Result>& layer) const -> Result {
+        return std::visit(overloaded{
+                              [&](const Const<Result>& c) -> Result { return map_fn(c.val); },
+                              [&](const Add<Result>& a) -> Result { return combine(*a.left, *a.right); },
+                              [&](const Mul<Result>& m) -> Result { return combine(*m.left, *m.right); },
+                          },
+                          layer);
+    }
+};
+
+inline constexpr ExprLayerFoldMap expr_layer_fold_map{};
+
+/** Lookup registration for the ExprF layer fold. */
+template <typename A>
+inline constexpr auto layer_fold_typeclass<ExprF<A>> = expr_layer_fold_map;
+// 8f25579d-443a-4685-b3af-01f8103f6863 end
 
 // 66235297-8e2a-4610-b6a4-a3f2a8837fb0
 /** Evaluate an expression tree bottom-up in one fold, resolving fmap

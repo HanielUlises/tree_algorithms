@@ -11,6 +11,7 @@ import beman.tree_algorithms;
 
 #else
 
+    #include <beman/tree_algorithms/fold_map_lookup.hpp>
     #include <beman/tree_algorithms/functor.hpp>
     #include <beman/tree_algorithms/overloaded.hpp>
 
@@ -309,6 +310,14 @@ struct FringeTreeLayerFoldMap {
 };
 
 inline constexpr FringeTreeLayerFoldMap fringe_tree_layer_fold_map{};
+
+/** Lookup registrations: the projection keyed on the tree type, the
+ * layer fold keyed on the layer type. */
+template <typename T>
+inline constexpr auto project_typeclass<FringeTree<T>> = fringe_tree_project;
+
+template <typename T, typename A>
+inline constexpr auto layer_fold_typeclass<FringeTreeF<T, A>> = fringe_tree_layer_fold_map;
 // e6cd1dd3-85b1-4ce2-bf7f-2ab1783d16f8 end
 
 } // namespace beman::tree_algorithms

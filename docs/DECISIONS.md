@@ -110,6 +110,39 @@ description            = "Recursive tree algorithms: fold_fix, unfold_fix, refol
 unit_test_library      = catch2
 ```
 
+## Amendment 2026-07-14 — the fold family joins the scope
+
+Ratified by Steve in the coordinated-set review of 2026-07-13 (recorded
+in the tree-coordination meta-repo, SYNC entries 1–3, and
+`docs/notes/extraction-plan.md` §3/§5); this amendment supersedes the
+scope sentence of Decision 1 and extends Decision 4's pattern.
+Everything else in Decisions 2–8 stands unchanged and applies to the new
+code.
+
+- **Scope**: in addition to the minimal core, this repository ships the
+  fold family: the direct verbs `fold_with`/`unfold_with`
+  (projection/embedding wrappers over `refold`; no Fix materialized) and
+  the elementwise `fold_map`, whose primary spelling takes the combine
+  operation and identity as plain explicit parameters — no Monoid trait
+  in the primary API, mirroring the explicit-`fmap` rule.
+- **Naming**: `fold_with`/`unfold_with` — fold/unfold *with* an
+  explicitly supplied projection/embedding. Decision 2's constraints
+  were respected in the selection (not `recursive_*`, not `*_fix`, no
+  literature jargon).
+- **Lookup**: the consumer-stub surface grows from functor-only to three
+  lookup objects — `functor_typeclass<Layer>`,
+  `layer_fold_typeclass<Layer>`, and `project_typeclass<Tree>` — all
+  following the same variable-template pattern, still a consumer of the
+  Paper A facility, never a respecification.
+- **Representations**: the fringe tree ships in `include/` as the second
+  adapter — direct-only (no Fix form, no Box; children held by value),
+  with its embedding maintaining the cached-measure invariant through
+  `branch()`.
+- **Rationale for the fold_map ownership**: `fold_map`'s motivation is
+  structures that aren't ranges (`ranges::fold_left` covers flat
+  sequences), so the fold family is Paper D material; beman.transpose's
+  `fold.hpp` remains unproposed evidence in Paper A's repo.
+
 ## Discrepancies
 
 Points where a cited source does not line up exactly with the decision as recorded, noted rather than silently adjusted:

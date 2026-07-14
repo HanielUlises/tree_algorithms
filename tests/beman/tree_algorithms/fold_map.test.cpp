@@ -5,6 +5,9 @@
 
 #include <beman/tree_algorithms/binary_tree.hpp>
 #include <beman/tree_algorithms/box.hpp>
+#include <beman/tree_algorithms/expression.hpp>
+#include <beman/tree_algorithms/fold_map_lookup.hpp>
+#include <beman/tree_algorithms/fringe_tree.hpp>
 #include <beman/tree_algorithms/overloaded.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -25,8 +28,17 @@ using beman::tree_algorithms::fold_fix;
 using beman::tree_algorithms::fold_map;
 using beman::tree_algorithms::make_box;
 using beman::tree_algorithms::overloaded;
+using beman::tree_algorithms::add_node;
+using beman::tree_algorithms::const_node;
+using beman::tree_algorithms::eval_algebra;
+using beman::tree_algorithms::FringeTree;
+using beman::tree_algorithms::has_layer_fold_instance;
+using beman::tree_algorithms::has_project_instance;
+using beman::tree_algorithms::mul_node;
 using beman::tree_algorithms::to_fix;
 using beman::tree_algorithms::wrap_fix;
+
+namespace bta = beman::tree_algorithms;
 
 namespace {
 
@@ -169,6 +181,46 @@ constexpr auto tree_concat_mirrored() -> bool {
 static_assert(tree_concat_in_order());
 static_assert(tree_concat_mirrored());
 
+// ---------------------------------------------------------------------
+// Lookup tier (fold_map_lookup.hpp): the everyday four-argument
+// spelling, resolving layer fold / fmap / projection through the
+// typeclass objects registered in the adapter headers.
+// ---------------------------------------------------------------------
+
+static_assert(has_layer_fold_instance<BinaryTreeF<int, int>>);
+static_assert(has_layer_fold_instance<bta::ExprF<int>>);
+static_assert(has_project_instance<BinaryTree<int>>);
+static_assert(has_project_instance<FringeTree<int>>);
+static_assert(!has_layer_fold_instance<int>);
+static_assert(!has_project_instance<int>);
+
+// The elementwise/structural contrast on the expression tree: summing
+// the constants of (1 + 2) * 3 sees the elements (6); evaluating it
+// interprets the structure (9).
+constexpr auto expr_constants_vs_eval() -> bool {
+    auto expr = mul_node(add_node(const_node(1), const_node(2)), const_node(3));
+    auto plus = [](int a, int b) { return a + b; };
+
+    int constant_sum   = fold_map<int>(identity_map, plus, 0, expr);
+    int constant_count = fold_map<int>([](int) { return 1; }, plus, 0, expr);
+    int evaluated      = bta::fold_fix<int>(eval_algebra, expr);
+    return constant_sum == 6 && constant_count == 3 && evaluated == 9;
+}
+
+static_assert(expr_constants_vs_eval());
+
+// Lookup overload agrees with the explicit form, at compile time.
+constexpr auto lookup_matches_explicit() -> bool {
+    auto tree = fixed_node(1, fixed_leaf(2), fixed_leaf(3));
+    auto via_lookup =
+        fold_map<std::string>(show_digit, concat, std::string{}, tree);
+    auto via_explicit = fold_map<std::string>(
+        show_digit, concat, std::string{}, binary_tree_layer_fold_map, fmap_btree_fn, tree);
+    return via_lookup == via_explicit && via_lookup == "213";
+}
+
+static_assert(lookup_matches_explicit());
+
 } // namespace
 
 // ---------------------------------------------------------------------
@@ -212,6 +264,25 @@ TEST_CASE("FoldMap - DerivedQueriesFromOneHook", "[tree_algorithms::fold_map]") 
     CHECK(fold_map<bool>([](int x) { return x > 4; }, lor, false, binary_tree_layer_fold_map, fmap_btree_fn, tree));
     CHECK_FALSE(
         fold_map<bool>([](int x) { return x > 5; }, lor, false, binary_tree_layer_fold_map, fmap_btree_fn, tree));
+}
+
+TEST_CASE("FoldMap - LookupOverloadOverTreesInTheirOwnRepresentation", "[tree_algorithms::fold_map]") {
+    // The everyday spelling: elementwise pieces plus the tree, everything
+    // structural resolved through the registered typeclass objects. Works
+    // identically over both shipped representations.
+    auto show_s   = [](int x) { return std::to_string(x); };
+    auto concat_s = [](const std::string& a, const std::string& b) { return a + b; };
+
+    auto bt = BinaryTree<int>::node(
+        1, BinaryTree<int>::node(2, BinaryTree<int>::leaf(4), BinaryTree<int>::leaf(5)), BinaryTree<int>::leaf(3));
+    CHECK(fold_map<std::string>(show_s, concat_s, std::string{}, bt) == "42513");
+
+    auto ft = FringeTree<int>::from_sequence({1, 2, 3});
+    CHECK(fold_map<std::string>(show_s, concat_s, std::string{}, ft) == "123");
+
+    auto plus = [](int a, int b) { return a + b; };
+    CHECK(fold_map<int>([](int) { return 1; }, plus, 0, bt) == 5);
+    CHECK(fold_map<int>([](int) { return 1; }, plus, 0, ft) == 3);
 }
 
 TEST_CASE("FoldMap - DirectPathAgreesWithAdapterPath", "[tree_algorithms::fold_map]") {

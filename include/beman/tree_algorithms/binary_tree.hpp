@@ -13,6 +13,7 @@ import beman.tree_algorithms;
 
     #include <beman/tree_algorithms/box.hpp>
     #include <beman/tree_algorithms/fix.hpp>
+    #include <beman/tree_algorithms/fold_map_lookup.hpp>
     #include <beman/tree_algorithms/functor.hpp>
     #include <beman/tree_algorithms/recursion_schemes_lookup.hpp>
 
@@ -220,6 +221,35 @@ struct BinaryTreeLayerFoldMap {
 
 inline constexpr BinaryTreeLayerFoldMap binary_tree_layer_fold_map{};
 // 79aa4002-fa4a-472e-b01b-f580a13f60ec end
+
+// ---------------------------------------------------------------------
+// Direct-verb projection, and the lookup registrations.
+// ---------------------------------------------------------------------
+
+// c9e514d9-4cf1-4fa1-ac4d-a9dfdf040291
+/** Projection for the direct verbs: exposes one layer of a BinaryTree,
+ * children as raw non-owning pointers read from the shared_ptr spine in
+ * place — no conversion, no structure copied beyond one layer. */
+struct BinaryTreeProjectFn {
+    template <typename T>
+    auto operator()(const BinaryTree<T>* t) const -> BinaryTreeF<T, const BinaryTree<T>*> {
+        using P = const BinaryTree<T>*;
+        return BinaryTreeF<T, P>{t->value(),
+                                 t->has_left() ? make_box<P>(&t->left()) : Box<P>{},
+                                 t->has_right() ? make_box<P>(&t->right()) : Box<P>{}};
+    }
+};
+
+inline constexpr BinaryTreeProjectFn binary_tree_project{};
+
+/** Lookup registrations: the projection keyed on the tree type, the
+ * layer fold keyed on the layer type. */
+template <typename T>
+inline constexpr auto project_typeclass<BinaryTree<T>> = binary_tree_project;
+
+template <typename T, typename A>
+inline constexpr auto layer_fold_typeclass<BinaryTreeF<T, A>> = binary_tree_layer_fold_map;
+// c9e514d9-4cf1-4fa1-ac4d-a9dfdf040291 end
 
 // ---------------------------------------------------------------------
 // Conversions between the shared_ptr tree and its Fix form.
