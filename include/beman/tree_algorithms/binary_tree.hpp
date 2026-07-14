@@ -196,6 +196,32 @@ inline constexpr auto functor_typeclass<BinaryTreeF<T, A> > = BinaryTreeFFunctor
 // 91fef612-39b5-4424-8ab5-7d8c80997e2c end
 
 // ---------------------------------------------------------------------
+// Elementwise layer fold (for fold_map).
+// ---------------------------------------------------------------------
+
+// 79aa4002-fa4a-472e-b01b-f580a13f60ec
+/** Folds one BinaryTreeF layer elementwise, in order: the left child's
+ * already-folded result, then the mapped node value, then the right
+ * child's result. Absent children contribute the identity. In-order
+ * traversal is this representation's contract; a non-commutative combine
+ * observes it.
+ */
+struct BinaryTreeLayerFoldMap {
+    template <typename MapFn, typename Combine, typename Result, typename T>
+    constexpr auto operator()(const MapFn&                  map_fn,
+                              const Combine&                combine,
+                              const Result&                 identity,
+                              const BinaryTreeF<T, Result>& layer) const -> Result {
+        Result left  = layer.left.ptr ? *layer.left : identity;
+        Result right = layer.right.ptr ? *layer.right : identity;
+        return combine(combine(left, map_fn(layer.value)), right);
+    }
+};
+
+inline constexpr BinaryTreeLayerFoldMap binary_tree_layer_fold_map{};
+// 79aa4002-fa4a-472e-b01b-f580a13f60ec end
+
+// ---------------------------------------------------------------------
 // Conversions between the shared_ptr tree and its Fix form.
 // ---------------------------------------------------------------------
 

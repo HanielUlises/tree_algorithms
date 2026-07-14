@@ -12,6 +12,7 @@ if(BEMAN_TREE_ALGORITHMS_USE_MODULES)
                     config.hpp
                     expression.hpp
                     fix.hpp
+                    fold_map.hpp
                     functor.hpp
                     functors.hpp
                     overloaded.hpp
@@ -32,6 +33,7 @@ else()
                     config.hpp
                     expression.hpp
                     fix.hpp
+                    fold_map.hpp
                     functor.hpp
                     functors.hpp
                     overloaded.hpp
