@@ -3,6 +3,27 @@
 Complete UUID-anchor map for docs/recursive-tree-algorithms.org and papers/DnnnnR0.
 "Serves" line numbers refer to the article's TRANSCLUDE-TODO markers.
 
+## Fold family additions (2026-07-14)
+
+| Anchor | File | Region | Serves |
+|---|---|---|---|
+| 6c596985-e990-4808-a504-2b651c34cebc | include/.../recursion_schemes.hpp | fold_with | paper synopsis; essay exhibit E3 candidate |
+| d160af7b-9a3c-4593-b8f5-fc1ff0404b37 | include/.../recursion_schemes.hpp | unfold_with | paper synopsis |
+| 52588460-d05a-43f9-97cc-01aa06732730 | include/.../fold_map.hpp | fold_map over Fix (explicit) | paper synopsis |
+| 5bf78776-81e7-4b66-8487-6615adc33b17 | include/.../fold_map.hpp | fold_map direct (explicit) | paper synopsis |
+| 94d2dd48-8976-43fc-943d-0dd27177e41a | include/.../fold_map_lookup.hpp | layer_fold/project lookup variables + traits | paper synopsis (lookup) |
+| e4beac7f-257b-4f2d-bfff-6b3b5daf61ad | include/.../fold_map_lookup.hpp | fold_map over Fix (lookup) | paper synopsis (lookup) |
+| 7f08b12d-3d26-4b5e-bf79-66d38f6fee0d | include/.../fold_map_lookup.hpp | fold_map direct (lookup) | paper synopsis (lookup) |
+| 79aa4002-fa4a-472e-b01b-f580a13f60ec | include/.../binary_tree.hpp | BinaryTreeLayerFoldMap | follow-up article |
+| c9e514d9-4cf1-4fa1-ac4d-a9dfdf040291 | include/.../binary_tree.hpp | BinaryTreeProjectFn + lookup registrations | follow-up article |
+| 1484acca-10e3-4500-93e1-092ccec4e3f6 | include/.../fringe_tree.hpp | FringeTree class | follow-up article |
+| 0a841db5-7eea-4a8c-bda8-64e9c015a32e | include/.../fringe_tree.hpp | FringeEmpty/FringeLeaf/FringeBranch + FringeTreeF | follow-up article |
+| a692305b-eb87-43fb-98a0-901a582d7ddf | include/.../fringe_tree.hpp | functor Impl/Map + specialization | follow-up article |
+| 321edf34-488f-4322-ac5c-320fa5c4d1fc | include/.../fringe_tree.hpp | project + embed (measure invariant) | follow-up article; measures bridge |
+| e6cd1dd3-85b1-4ce2-bf7f-2ab1783d16f8 | include/.../fringe_tree.hpp | FringeTreeLayerFoldMap + lookup registrations | follow-up article |
+| 8f25579d-443a-4685-b3af-01f8103f6863 | include/.../expression.hpp | ExprLayerFoldMap (6-vs-9 contrast) | paper §Folding; essay exhibit E4 candidate |
+| 04e450a4-3614-4f09-a185-1835f935673a | examples/nonce_tree_direct.cpp | nonce Node + NodeF + fmap + project | paper §Trees you don't own; essay exhibit E3 |
+
 ## Examples (Task 3b)
 
 | Anchor | File | Region | Serves |
