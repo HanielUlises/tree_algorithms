@@ -32,6 +32,15 @@ export
 
 CONFIG?=Asan
 
+# Benchmarks are opt-in and driven by the bench* targets below. BENCHMARKS
+# gates whether the benchmark targets are configured at all; BENCH_CONFIG is
+# the build config used to *measure* — RelWithDebInfo (optimized, symbols),
+# never a sanitizer build, which would wreck the timings.
+# The build config used to *measure* benchmarks: Bench is optimized and
+# unsanitized (defined in the toolchain flags files, like Gcov/Asan). Never
+# measure under a sanitizer.
+BENCH_CONFIG?=Bench
+
 export
 
 ifeq ($(strip $(TOOLCHAIN)),)
@@ -44,7 +53,7 @@ else
 	_local_toolchain?=$(CURDIR)/cmake/$(TOOLCHAIN)-toolchain.cmake
 endif
 
-_configuration_types?="RelWithDebInfo;Debug;Tsan;Asan;Gcov"
+_configuration_types?="RelWithDebInfo;Debug;Tsan;Asan;Gcov;Bench"
 
 _build_path?=$(_build_dir)/$(_build_name)
 _build_path:=$(subst //,/,$(_build_path))
@@ -70,6 +79,14 @@ endif
 CMAKE ?= $(UV) run cmake
 CTEST ?= $(UV) run ctest
 
+# Build telemetry (CMake instrumentation) is turned on through a top-level
+# include: infra/cmake/BuildTelemetry.cmake runs configure_build_telemetry()
+# on every configure, which is what keeps the instrumentation query alive.
+# It is appended to the dependency-provider/vcpkg top-level include as a
+# semicolon-separated list rather than replacing it.
+_telemetry_include:=$(CURDIR)/infra/cmake/BuildTelemetry.cmake
+_top_level_includes:=$(_cmake_top_level);$(_telemetry_include)
+
 define run_cmake =
 	$(CMAKE) \
 	-G "Ninja Multi-Config" \
@@ -77,7 +94,7 @@ define run_cmake =
 	-DCMAKE_INSTALL_PREFIX=$(abspath $(INSTALL_PREFIX)) \
 	-DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
 	-DCMAKE_PREFIX_PATH=$(CURDIR)/infra/cmake \
-	-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$(_cmake_top_level) \
+	-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="$(_top_level_includes)" \
 	-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 	-DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
 	-DCMAKE_TOOLCHAIN_FILE=$(_toolchain) \
@@ -219,6 +236,44 @@ coverage: venv $(_build_path)/CMakeCache.txt
 .PHONY: view-coverage
 view-coverage: ## View the coverage report
 	sensible-browser $(_build_path)/coverage/coverage.html
+
+# ---------------------------------------------------------------------
+# Benchmarks.
+#
+# The benchmark targets are ordinary targets in the default build, so they
+# always compile and can never rot silently. What the bench* targets add is
+# *measurement*: they build and run in the Bench configuration (optimized,
+# unsanitized — see the toolchain flags files), and read compile timings out
+# of the CMake build telemetry, which drops one per-translation-unit
+# `compile` event into $(_build_path)/.trace on every build.
+#
+# CCACHE_RECACHE forces a real (measurable) recompile while keeping the
+# compiler cache coherent — it recompiles and refreshes the cache entry
+# rather than serving an old object; the produced objects are identical, so
+# the build stays coherent. Touching the generated sources is what makes
+# ninja consider them dirty.
+# ---------------------------------------------------------------------
+
+_bench_bin_dir:=$(_build_path)/benchmarks/beman/tree_algorithms/$(BENCH_CONFIG)
+_bench_ct_src:=$(_build_path)/benchmarks/beman/tree_algorithms/ct_*.cpp
+
+.PHONY: bench
+bench: $(_build_path)/CMakeCache.txt ## Build and run the runtime microbenchmarks (Bench config)
+	$(CMAKE) --build $(_build_path) --config $(BENCH_CONFIG) --target bench_runtime_all
+	@echo "==== fold: consuming a very large tree ===="
+	$(_bench_bin_dir)/beman.tree_algorithms.benchmarks.fold "[!benchmark]"
+	@echo "==== build: producing / copying / refolding ===="
+	$(_bench_bin_dir)/beman.tree_algorithms.benchmarks.build "[!benchmark]"
+
+.PHONY: bench-compile
+bench-compile: $(_build_path)/CMakeCache.txt ## Recompile the compile-time benchmark matrix and report per-TU compile time
+	-touch $(_bench_ct_src)
+	CCACHE_RECACHE=1 $(CMAKE) --build $(_build_path) --config $(BENCH_CONFIG) --target bench_ct_all
+	$(PYEXEC) benchmarks/compile_trace_report.py --build-dir $(_build_path) --config $(BENCH_CONFIG)
+
+.PHONY: bench-report
+bench-report: ## Re-print the compile-time report from the existing .trace, without rebuilding
+	$(PYEXEC) benchmarks/compile_trace_report.py --build-dir $(_build_path) --config $(BENCH_CONFIG)
 
 .PHONY: docs
 docs: ## Build the docs with Doxygen

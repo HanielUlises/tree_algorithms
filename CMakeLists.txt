@@ -26,6 +26,15 @@ option(
     ${PROJECT_IS_TOP_LEVEL}
 )
 
+# Benchmarks build with everything else so they can never rot silently.
+# They are only *run* / *measured* on demand (make bench, bench-compile) in
+# the Bench configuration; ordinary builds just keep them compiling.
+option(
+    BEMAN_TREE_ALGORITHMS_BUILD_BENCHMARKS
+    "Enable building benchmarks. Default: ${PROJECT_IS_TOP_LEVEL}. Values: { ON, OFF }."
+    ${PROJECT_IS_TOP_LEVEL}
+)
+
 option(
     BEMAN_TREE_ALGORITHMS_USE_MODULES
     "Provide beman.tree_algorithms as a C++ module"
@@ -92,6 +101,10 @@ endif()
 
 if(BEMAN_TREE_ALGORITHMS_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+if(BEMAN_TREE_ALGORITHMS_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks/beman/tree_algorithms)
 endif()
 
 # Anchored-snippet gate. The article (docs/recursive-tree-algorithms.org)

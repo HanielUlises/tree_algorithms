@@ -2,8 +2,12 @@ include_guard(GLOBAL)
 
 set(CMAKE_CXX_STANDARD 23)
 
+# This is a constexpr-heavy library: trees are built and folded at compile
+# time (tests, examples, and the compile-time benchmarks all do it), so the
+# default constexpr step ceiling is lifted project-wide. Applied to the base
+# flags so every configuration is coherent.
 set(CMAKE_CXX_FLAGS
-    "-stdlib=libc++ -Wall -Wextra -std=gnu++23"
+    "-stdlib=libc++ -Wall -Wextra -std=gnu++23 -fconstexpr-steps=100000000"
     CACHE STRING
     "CXX_FLAGS"
     FORCE
@@ -37,6 +41,16 @@ set(CMAKE_CXX_FLAGS_ASAN
     "-O3 -g -fsanitize=address,undefined,leak"
     CACHE STRING
     "C++ ASAN Flags"
+    FORCE
+)
+
+# Benchmark configuration: optimized, symbols kept, asserts off, frame
+# pointers preserved for profilers. Deliberately unsanitized — benchmarks
+# are measured here (make bench / BENCH_CONFIG=Bench), never under Asan/Tsan.
+set(CMAKE_CXX_FLAGS_BENCH
+    "-O3 -g -DNDEBUG -fno-omit-frame-pointer"
+    CACHE STRING
+    "C++ Benchmark Flags"
     FORCE
 )
 set(CMAKE_CXX_FLAGS_GCOV
