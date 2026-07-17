@@ -20,6 +20,7 @@ if(BEMAN_TREE_ALGORITHMS_USE_MODULES)
                     overloaded.hpp
                     recursion_schemes.hpp
                     recursion_schemes_lookup.hpp
+                    rose_tree.hpp
                     tree_algorithms.hpp
                     todo.hpp
                     "${PROJECT_BINARY_DIR}/include/beman/tree_algorithms/config_generated.hpp"
@@ -43,6 +44,7 @@ else()
                     overloaded.hpp
                     recursion_schemes.hpp
                     recursion_schemes_lookup.hpp
+                    rose_tree.hpp
                     tree_algorithms.hpp
                     todo.hpp
                     "${PROJECT_BINARY_DIR}/include/beman/tree_algorithms/config_generated.hpp"

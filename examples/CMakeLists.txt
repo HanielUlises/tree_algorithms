@@ -6,6 +6,8 @@ set(ALL_EXAMPLES
     expression_algorithms
     binary_tree_adapt
     nonce_tree_direct
+    search_tree_on_fix
+    sequence_algorithms
 )
 message("Examples to be built: ${ALL_EXAMPLES}")
 

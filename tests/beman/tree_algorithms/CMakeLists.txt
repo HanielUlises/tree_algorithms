@@ -173,6 +173,22 @@ if(BEMAN_TREE_ALGORITHMS_USE_MODULES)
     )
 endif()
 
+add_executable(beman.tree_algorithms.tests.rose_tree)
+target_sources(
+    beman.tree_algorithms.tests.rose_tree
+    PRIVATE rose_tree.test.cpp
+)
+target_link_libraries(
+    beman.tree_algorithms.tests.rose_tree
+    PRIVATE beman::tree_algorithms Catch2::Catch2WithMain
+)
+if(BEMAN_TREE_ALGORITHMS_USE_MODULES)
+    set_target_properties(
+        beman.tree_algorithms.tests.rose_tree
+        PROPERTIES CXX_MODULE_STD ON
+    )
+endif()
+
 # The fetch-content dependency provider makes Catch2 available inside a
 # function scope, so its extras/ directory never reaches CMAKE_MODULE_PATH
 # and catch2_SOURCE_DIR is not visible here; recover it from FetchContent's
@@ -198,3 +214,4 @@ catch_discover_tests(beman.tree_algorithms.tests.functors)
 catch_discover_tests(beman.tree_algorithms.tests.binary_tree)
 catch_discover_tests(beman.tree_algorithms.tests.fold_map)
 catch_discover_tests(beman.tree_algorithms.tests.fringe_tree)
+catch_discover_tests(beman.tree_algorithms.tests.rose_tree)

@@ -23,6 +23,7 @@ import beman.tree_algorithms;
     #include <beman/tree_algorithms/overloaded.hpp>
     #include <beman/tree_algorithms/recursion_schemes.hpp>
     #include <beman/tree_algorithms/recursion_schemes_lookup.hpp>
+    #include <beman/tree_algorithms/rose_tree.hpp>
     #include <beman/tree_algorithms/todo.hpp>
 
 #endif // BEMAN_TREE_ALGORITHMS_USE_MODULES() &&

@@ -27,6 +27,8 @@ using beman::tree_algorithms::functor_typeclass;
 using beman::tree_algorithms::has_functor_instance;
 using beman::tree_algorithms::overloaded;
 using beman::tree_algorithms::unfold_with;
+using beman::tree_algorithms::view_l;
+using beman::tree_algorithms::view_r;
 
 namespace {
 
@@ -123,6 +125,42 @@ TEST_CASE("FringeTree - SequenceOrder", "[tree_algorithms::fringe_tree]") {
     // sequence either way.
     auto c = Tree::leaf(3).cons(2).cons(1);
     CHECK(c.flatten() == std::vector<int>{1, 2, 3});
+}
+
+TEST_CASE("FringeTree - ViewsDecomposeOnTheQuotient", "[tree_algorithms::fringe_tree]") {
+    // The same sequence in two shapes: snoc-built leans left, cons-built
+    // leans right. The view contract is a quotient contract — the same
+    // end element comes off, and the rest is specified as a SEQUENCE;
+    // its shape is the representation's own business.
+    auto left_leaning  = Tree::from_sequence({1, 2, 3});
+    auto right_leaning = Tree::leaf(3).cons(2).cons(1);
+
+    auto vl1 = view_l(left_leaning);
+    auto vl2 = view_l(right_leaning);
+    REQUIRE(vl1);
+    REQUIRE(vl2);
+    CHECK(vl1->d_value == 1);
+    CHECK(vl2->d_value == 1);
+    CHECK(vl1->d_rest.flatten() == std::vector<int>{2, 3});
+    CHECK(vl2->d_rest.flatten() == std::vector<int>{2, 3});
+    // The cached measure survives the decomposition (the rest is built
+    // through concat/branch, so it is correct by construction).
+    CHECK(vl1->d_rest.measure() == 2U);
+    CHECK(vl2->d_rest.measure() == 2U);
+
+    auto vr = view_r(left_leaning);
+    REQUIRE(vr);
+    CHECK(vr->d_value == 3);
+    CHECK(vr->d_rest.flatten() == std::vector<int>{1, 2});
+
+    // Boundary cases: empty yields nothing; a leaf yields its value and
+    // the empty rest.
+    CHECK(!view_l(Tree::empty()));
+    CHECK(!view_r(Tree::empty()));
+    auto vleaf = view_r(Tree::leaf(9));
+    REQUIRE(vleaf);
+    CHECK(vleaf->d_value == 9);
+    CHECK(vleaf->d_rest.is_empty());
 }
 
 // ---------------------------------------------------------------------

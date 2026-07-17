@@ -177,6 +177,68 @@ class FringeTree {
 // 1484acca-10e3-4500-93e1-092ccec4e3f6 end
 
 // ---------------------------------------------------------------------
+// Views: decomposition at either end, in Paper C's vocabulary.
+// ---------------------------------------------------------------------
+
+// Evidence, not (yet) proposed surface: these mirror the FingerTree
+// interface of Paper C — view_l/view_r returning an optional View of the
+// end element and the rest — spelled as free functions so the ported
+// class above stays byte-identical to its anchored form. The contract
+// is deliberately a QUOTIENT contract: the rest's element sequence is
+// specified, its shape is not. A representation is free to rebalance
+// internally (FingerTree does, aggressively); nothing observable through
+// views, concat, or the elementwise folds can tell. Sequence-generic
+// algorithms — cons/snoc, from_range, fold_left, sequence equality —
+// derive from empty/leaf/concat plus the views alone; see
+// examples/sequence_algorithms.cpp.
+
+// f4f21f0a-6b7e-4f0d-9a3c-58f1c2d7ab26
+/** One step of end-wise decomposition: the end element and the rest of
+ * the sequence. Field names follow FingerTree::View (Paper C). */
+template <typename T>
+struct FringeView {
+    T             d_value;
+    FringeTree<T> d_rest;
+};
+
+/** Decompose at the left end: the first element and the rest. The rest's
+ * sequence is flatten(tree) minus its head; its shape is unspecified.
+ * Empty tree yields nullopt. */
+template <typename T>
+auto view_l(const FringeTree<T>& tree) -> std::optional<FringeView<T>> {
+    if (tree.is_empty()) {
+        return std::nullopt;
+    }
+    if (tree.is_leaf()) {
+        return FringeView<T>{tree.value(), FringeTree<T>::empty()};
+    }
+    auto sub = view_l(tree.left());
+    if (!sub) {
+        return view_l(tree.right());
+    }
+    sub->d_rest = FringeTree<T>::concat(sub->d_rest, tree.right());
+    return sub;
+}
+
+/** Decompose at the right end: the last element and the rest. */
+template <typename T>
+auto view_r(const FringeTree<T>& tree) -> std::optional<FringeView<T>> {
+    if (tree.is_empty()) {
+        return std::nullopt;
+    }
+    if (tree.is_leaf()) {
+        return FringeView<T>{tree.value(), FringeTree<T>::empty()};
+    }
+    auto sub = view_r(tree.right());
+    if (!sub) {
+        return view_r(tree.left());
+    }
+    sub->d_rest = FringeTree<T>::concat(tree.left(), sub->d_rest);
+    return sub;
+}
+// f4f21f0a-6b7e-4f0d-9a3c-58f1c2d7ab26 end
+
+// ---------------------------------------------------------------------
 // The base functor describing one layer of that tree.
 // ---------------------------------------------------------------------
 
