@@ -143,6 +143,16 @@ code.
   sequences), so the fold family is Paper D material; beman.transpose's
   `fold.hpp` remains unproposed evidence in Paper A's repo.
 
+## Amendment 2026-07-17 — paper number assigned
+
+The `DnnnnR0` placeholder anticipated by Decision 8 ("placeholder until
+a number is requested") is resolved: the paper is **D4322R0**, title
+"Algorithms for Trees" (`papers/algorithms-for-trees.md`,
+superseding `papers/DnnnnR0-recursive-tree-algorithms.md`, which is
+removed).
+Decision 8's answer sheet stays as recorded — it is a verbatim
+generation-time record, not a live pointer.
+
 ## Discrepancies
 
 Points where a cited source does not line up exactly with the decision as recorded, noted rather than silently adjusted:

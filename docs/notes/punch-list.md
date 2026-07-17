@@ -18,7 +18,7 @@ review).
 
 ## OPEN — needs Steve
 
-- Request a real WG21 paper number to replace the `DnnnnR0` placeholder (`papers/DnnnnR0-recursive-tree-algorithms.md`, `README.md:17`).
+- ~~Request a real WG21 paper number to replace the `DnnnnR0` placeholder.~~ **RESOLVED 2026-07-17**: the paper is D4322R0, "Algorithms for Trees"; the draft moved to `papers/algorithms-for-trees.md` (DnnnnR0 file removed), README and DECISIONS.md amendment updated.
 - Decide whether to upstream copier-template fixes to `steve-downey/exemplar`. Candidates seen so far: the `gnu++20`→`gnu++23` flag bump (already template-sourced per prior sweep), and the stale `BEMAN_EXEMPLAR_USE_MODULES` guard at `tests/beman/tree_algorithms/CMakeLists.txt:11` (see mechanical below) — the latter is exactly the kind of copier leftover that should be fixed in the template itself so future `exemplar`-derived repos don't inherit it.
 - README/registry owner swap: decide whether `steve-downey/tree_algorithms` is this repo's permanent home, or whether it is destined to move into the `bemanproject` org. Everything below is currently pointed at `bemanproject` and needs a decision, not just an edit:
   - CI/Lint/Coverage badges, `README.md:8-12`.
@@ -31,8 +31,8 @@ review).
 ## OPEN — mechanical follow-ups
 
 - README badges (`README.md:8-12`) and the vcpkg registry reference (`vcpkg-configuration.json`, `README.md:~86`) still say `bemanproject/tree_algorithms` / `bemanproject/vcpkg-registry`; swap to `steve-downey/...` once the needs-Steve owner-swap decision above is made.
-- `README.md:39` still says "(Test Only) GoogleTest"; this is a Catch2 project (`find_package(Catch2 3 REQUIRED)` in `tests/beman/tree_algorithms/CMakeLists.txt:3`) — change the bullet to Catch2.
-- README still carries copier-template placeholders that need real prose before publication: line 16 (`` `beman.tree_algorithms` is (... TODO: description). ``), line 17 (`**Implements**: `std::todo` proposed in [TODO (DnnnnR0)]...`, tangled up with the paper-number decision above), and the `## Usage` section (currently just `TODO`).
+- ~~`README.md:39` still says "(Test Only) GoogleTest".~~ **RESOLVED 2026-07-17**: bullet now says Catch2.
+- ~~README copier-template placeholders (description, Implements line, Usage section).~~ **RESOLVED 2026-07-17**: real description, Implements pointing at D4322R0, and a Usage section with a code sketch and the annotated example list.
 - `.github/ISSUE_TEMPLATE/*.md` (`implementation-deficiency.md`, `infrastructure-issues.md`, `paper-discussion.md`) and `.github/pull_request_template.md` link to `bemanproject/beman` docs — cosmetic, low priority, only swap once the owner-swap decision above lands.
 - `tests/beman/tree_algorithms/CMakeLists.txt:11` guards the `todo` test's `CXX_MODULE_STD` property with `BEMAN_EXEMPLAR_USE_MODULES` (undefined in this project — wrong copier project name), so that one target's module property silently never applies; every other guard in the same file (lines 24, 37, 53, 69, 82, 98, 114, 127, 143) correctly uses `BEMAN_TREE_ALGORITHMS_USE_MODULES`. One-line rename fix: `BEMAN_EXEMPLAR_USE_MODULES` → `BEMAN_TREE_ALGORITHMS_USE_MODULES`.
 - Lint Check (pre-commit) is red in CI: beman-tidy's `file.license_id` check requires an SPDX line in the first 25 lines of every file. Currently missing from (verified against the working tree, not just the CI log):

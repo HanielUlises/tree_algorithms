@@ -1,4 +1,4 @@
-# beman.tree_algorithms: Recursive tree algorithms: fold_fix, unfold_fix, refold over fixed-point trees
+# beman.tree_algorithms: Algorithms for Trees
 
 <!--
 SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
@@ -12,9 +12,18 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 ![Standard Target](https://github.com/bemanproject/beman/blob/main/images/badges/cpp29.svg)
 <!-- markdownlint-restore -->
 
-`beman.tree_algorithms` is (... TODO: description).
+`beman.tree_algorithms` is a family of generic algorithms over recursive tree
+structures. The structural verbs `fold_fix`, `unfold_fix`, and `refold` consume,
+build, and fuse fixed-point trees; `fold_with` and `unfold_with` are the same
+folds over a tree in its own representation, through an explicitly supplied
+projection or embedding — no conversion, no fixed-point wrapper materialized;
+and `fold_map` is the elementwise fold, derived from the structural verbs. The
+user supplies a non-recursive per-layer operation; the algorithm supplies the
+recursion. No tree container is proposed — the algorithms work across
+representations users already have.
 
-**Implements**: `std::todo` proposed in [TODO (DnnnnR0)](https://wg21.link/DnnnnR0).
+**Implements**: the algorithm family proposed in [Algorithms for Trees
+(D4322R0)](papers/algorithms-for-trees.md).
 
 **Status**: [Under development and not yet ready for production use.](https://github.com/bemanproject/beman/blob/main/docs/beman_library_maturity_model.md#under-development-and-not-yet-ready-for-production-use)
 
@@ -24,9 +33,35 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 ## Usage
 
-TODO
+Describe one layer of your tree as a base functor — a struct with a type
+parameter in the recursive positions — and each algorithm becomes a call with a
+non-recursive per-layer operation:
 
-Full runnable examples can be found in [`examples/`](examples/).
+```c++
+// Evaluate an expression tree: the algebra sees children that are
+// already ints; fold_fix supplies the recursion.
+int result = fold_fix<int>(eval_algebra, tree);
+
+// Sum the constants instead: map each element, combine associatively.
+int sum = fold_map<int>(std::identity{}, std::plus{}, 0, tree);
+```
+
+Full runnable examples can be found in [`examples/`](examples/):
+
+* [`fixpoint_tree_example.cpp`](examples/fixpoint_tree_example.cpp) — a
+  self-contained expression tree and fold, suitable for Compiler Explorer.
+* [`expression_algorithms.cpp`](examples/expression_algorithms.cpp) — algebras
+  as reusable algorithm objects over the repository's expression tree.
+* [`binary_tree_adapt.cpp`](examples/binary_tree_adapt.cpp) — adapting an
+  existing `shared_ptr` binary tree by conversion (`to_fix`/`from_fix`).
+* [`nonce_tree_direct.cpp`](examples/nonce_tree_direct.cpp) — folding and
+  building a move-only `unique_ptr` tree in place with `fold_with` and
+  `unfold_with`; no conversion, no fixed-point wrapper.
+* [`search_tree_on_fix.cpp`](examples/search_tree_on_fix.cpp) — a full working
+  binary search tree built on `Fix` directly: folds where they fit, plain
+  structural recursion where they don't.
+* [`sequence_algorithms.cpp`](examples/sequence_algorithms.cpp) — sequence
+  algorithms written against a quotient interface that never sees tree shape.
 
 ## Dependencies
 
@@ -36,7 +71,7 @@ This project requires at least the following to build:
 
 * A C++ compiler that conforms to the C++23 standard or greater
 * CMake 3.30 or later
-* (Test Only) GoogleTest
+* (Test Only) Catch2
 
 You can disable building tests by setting CMake option `BEMAN_TREE_ALGORITHMS_BUILD_TESTS` to
 `OFF` when configuring the project.

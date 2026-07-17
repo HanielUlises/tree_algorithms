@@ -1,6 +1,6 @@
 # Anchor inventory — transclusion contract (Tasks 3a/3b → 4.4)
 
-Complete UUID-anchor map for docs/recursive-tree-algorithms.org and papers/DnnnnR0.
+Complete UUID-anchor map for docs/recursive-tree-algorithms.org and papers/algorithms-for-trees.md (formerly DnnnnR0).
 "Serves" line numbers refer to the article's TRANSCLUDE-TODO markers.
 
 ## Fold family additions (2026-07-14)
@@ -23,6 +23,24 @@ Complete UUID-anchor map for docs/recursive-tree-algorithms.org and papers/Dnnnn
 | e6cd1dd3-85b1-4ce2-bf7f-2ab1783d16f8 | include/.../fringe_tree.hpp | FringeTreeLayerFoldMap + lookup registrations | follow-up article |
 | 8f25579d-443a-4685-b3af-01f8103f6863 | include/.../expression.hpp | ExprLayerFoldMap (6-vs-9 contrast) | paper §Folding; essay exhibit E4 candidate |
 | 04e450a4-3614-4f09-a185-1835f935673a | examples/nonce_tree_direct.cpp | nonce Node + NodeF + fmap + project | paper §Trees you don't own; essay exhibit E3 |
+
+## Rose tree and fringe views (2026-07-17)
+
+Added with `docs/notes/representations-and-sequence-interfaces.md`.
+Consumed 2026-07-17: the article transcludes 8f0e2d0a and 4b9d17f2 (§Not
+Every Tree Has an In-Order), and D4322R0 carries the §4.5 paper delta as
+hand-mirrored prose (rose tree in implementation experience, the
+no-generic-in-order argument in §Folding). The article's 2026-07-17 pass
+also consumed 6c596985/d160af7b (fold_with/unfold_with),
+e4beac7f (fold_map lookup), 8f25579d (ExprLayerFoldMap), and
+04e450a4 (nonce ingredients) — previously marked "follow-up article".
+
+| Anchor | File | Region | Serves |
+|---|---|---|---|
+| 8f0e2d0a-5c1f-4be4-9f1e-3b7a8c92d461 | include/.../rose_tree.hpp | RoseF + Layer/Fix aliases + rose() | paper implementation-experience (fifth representation) |
+| 0d3c6e8b-92f4-45f7-8a26-6c1de5b0a973 | include/.../rose_tree.hpp | functor Impl/Map + specialization | spare |
+| 4b9d17f2-30a5-4e1c-b8d4-7f52a6c3e08d | include/.../rose_tree.hpp | RoseLayerFoldMap + lookup registration | paper traversal-order contract (no generic in-order) |
+| f4f21f0a-6b7e-4f0d-9a3c-58f1c2d7ab26 | include/.../fringe_tree.hpp | FringeView + view_l/view_r | sequence-quotient story; essay candidate |
 
 ## Examples (Task 3b)
 
@@ -65,7 +83,7 @@ Complete UUID-anchor map for docs/recursive-tree-algorithms.org and papers/Dnnnn
 - functor.hpp: `functor_typeclass` variable-template default → article L316
 - recursion_schemes.hpp: `fold_fix` explicit-fmap overload → article L448
 - recursion_schemes_lookup.hpp: `layer_fmap` → L511; `fold_fix` → L523; `unfold_fix` → L604; `refold` → L660
-- papers/DnnnnR0 SYNOPSIS-TRANSCLUDE-TODO (~L165) needs the verb-signature anchors above.
+- papers/D4322R0 synopsis is hand-mirrored (see its HTML comment) against the verb-signature anchors above; re-diff on any signature change.
 
 ## Snippet gate
 

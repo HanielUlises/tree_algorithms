@@ -19,7 +19,7 @@
 #+BIBLIOGRAPHY: ./references.bib
 
 #+begin_abstract
-Expression trees without inheritance or virtual functions, and three generic verbs --- ~fold_fix~, ~unfold_fix~, ~refold~ --- that consume, build, and fuse them.
+Expression trees without inheritance or virtual functions, and the generic verbs that consume, build, and fuse them: ~fold_fix~, ~unfold_fix~, and ~refold~ over fixed-point trees; ~fold_with~ and ~unfold_with~ over trees in their own representations; ~fold_map~ for the elementwise queries.
 The algebra answers /how to combine/; the recursion scheme answers /how to recurse/; they never tangle.
 This is the library behind ~beman::tree_algorithms~.
 #+end_abstract
@@ -429,21 +429,122 @@ Only the adapter knows the tree is really a ~shared_ptr~ structure; the algebra 
 
 #+transclude: [[file:../examples/binary_tree_adapt.cpp::fba6bbba-6cd8-4f4f-ba18-b584cf672a79]]  :lines 2- :src cpp :end "fba6bbba-6cd8-4f4f-ba18-b584cf672a79 end"
 
+* Trees You Don't Own: fold_with and unfold_with
+
+~to_fix~ works.
+It is also a dodge.
+Conversion copies the whole tree into ~Fix~ form before any algebra runs, and "convert your tree to our form first" is a weak answer if the point of generic verbs is to serve representations users already have.
+And some trees cannot take that road at all: a tree holding its children by ~unique_ptr~ is move-only, and a copy-based conversion pipeline has nothing to grab.
+
+The direct verbs close the gap with one more explicit callable each.
+A /projection/ exposes one layer of the tree as a base-functor value --- ~project : Tree \to F<Handle>~ --- where the child handles are whatever the projection itself accepts.
+Raw pointers into the existing structure work; nothing is copied beyond one layer at a time.
+
+From [[orgit-file:include/beman/tree_algorithms/recursion_schemes.hpp][=include/beman/tree_algorithms/recursion_schemes.hpp=]]:
+
+#+transclude: [[file:../include/beman/tree_algorithms/recursion_schemes.hpp::6c596985-e990-4808-a504-2b651c34cebc]]  :lines 2- :src cpp :end "6c596985-e990-4808-a504-2b651c34cebc end"
+
+Compare with ~fold_fix~: where ~fold_fix~ calls ~unwrap_fix~ to get a layer, ~fold_with~ calls the projection you handed it.
+That is the whole difference.
+~fold_fix~ is the degenerate case whose projection is ~unwrap_fix~, and the test suite pins that equivalence in a ~static_assert~.
+
+Here is a tree I pointedly do not own: a ~Node~ with ~unique_ptr~ children, written the way everyone writes them.
+Three ingredients adapt it --- a layer struct, an ~fmap~ for that layer, and the projection.
+From [[orgit-file:examples/nonce_tree_direct.cpp][=examples/nonce_tree_direct.cpp=]]:
+
+#+transclude: [[file:../examples/nonce_tree_direct.cpp::04e450a4-3614-4f09-a185-1835f935673a]]  :lines 2- :src cpp :end "04e450a4-3614-4f09-a185-1835f935673a end"
+
+~fold_with~ runs over the ~unique_ptr~ spine in place.
+The dual verb builds in place: ~unfold_with~ takes an /embedding/ --- ~embed : F<Tree> \to Tree~, reconstructing one layer of the user's representation ---
+
+#+transclude: [[file:../include/beman/tree_algorithms/recursion_schemes.hpp::d160af7b-9a3c-4593-b8f5-fc1ff0404b37]]  :lines 2- :src cpp :end "d160af7b-9a3c-4593-b8f5-fc1ff0404b37 end"
+
+--- and the example uses it to grow a balanced search tree over a range directly into ~unique_ptr~ nodes, a move-only carrier no conversion pipeline could produce.
+No ~Fix~ is materialized in either direction.
+Both verbs are ~refold~ in disguise: the projection is a coalgebra, the embedding is an algebra, and the fusion does the rest.
+
+* The Elementwise Fold: fold_map
+
+The structural verbs consume a layer at a time.
+Most everyday queries never see a layer; they see elements.
+Length, sums, renderings, any/all --- each maps every element to some result type and combines the results with an associative operation that has an identity.
+That verb is ~fold_map~, and the everyday spelling is four arguments.
+From [[orgit-file:include/beman/tree_algorithms/fold_map_lookup.hpp][=include/beman/tree_algorithms/fold_map_lookup.hpp=]]:
+
+#+transclude: [[file:../include/beman/tree_algorithms/fold_map_lookup.hpp::e4beac7f-257b-4f2d-bfff-6b3b5daf61ad]]  :lines 2- :src cpp :end "e4beac7f-257b-4f2d-bfff-6b3b5daf61ad end"
+
+The name is the cross-language consensus --- ~foldMap~ in Haskell's [[https://hackage.haskell.org/package/base/docs/Data-Foldable.html][=Data.Foldable=]], in Cats, in PureScript: map, then fold.
+
+Why not ~std::ranges::fold_left~?
+Because ~fold_left~ folds ranges, and a tree is not a range.
+Flattening a tree into an iteration order to fold it costs an intermediate sequence and discards exactly the structure that made it a tree.
+~fold_map~ folds the tree where it stands.
+And because combine is required to be associative with a two-sided identity, the result is independent of how the tree happens to be bracketed --- the same element sequence held in two differently shaped trees folds to the same answer.
+Monoid associativity /is/ shape-independence.
+That is what licenses a representation to rebalance behind your back, and the fringe tree's tests pin it by folding one sequence in two shapes.
+
+The per-representation ingredient is the layer fold: the callable that folds one layer's mapped elements together with the already-folded child results, in the representation's contractual order.
+What counts as an element is also the instance's choice.
+The expression tree's elements are its constants:
+
+#+transclude: [[file:../include/beman/tree_algorithms/expression.hpp::8f25579d-443a-4685-b3af-01f8103f6863]]  :lines 2- :src cpp :end "8f25579d-443a-4685-b3af-01f8103f6863 end"
+
+Summing the constants of ~(1 + 2) * 3~ by ~fold_map~ gives 6.
+Evaluating it by ~fold_fix~ gives 9.
+One fixture, both verbs, and the elementwise/structural distinction is visible in the values.
+
+There is no new machinery underneath.
+~fold_map~ over a fixed-point tree /is/ ~fold_fix~ with an algebra that combines one layer through the supplied operations, and ~fold_map~ over a projected tree /is/ ~fold_with~ with the same algebra.
+The derivation is the implementation.
+And the derivations continue downstream: ~fold_left~ falls out of ~fold_map~ by mapping each element to a "feed me to the accumulator" step and composing the steps left to right --- the same route Haskell takes from ~foldMap~ to ~foldl~ through ~Dual~ and ~Endo~ --- which [[orgit-file:examples/sequence_algorithms.cpp][=examples/sequence_algorithms.cpp=]] demonstrates over the fringe tree.
+One primitive, a family of everyday folds.
+
+* Not Every Tree Has an In-Order
+
+Note what the layer fold was /not/ told: the traversal order.
+That is deliberate, and a rose tree is the reason.
+
+~Fix~ and ~Box~ are not binary-tree machinery.
+A rose (multiway) tree --- a value and any number of children, Haskell's [[https://hackage.haskell.org/package/containers/docs/Data-Tree.html][=Data.Tree=]] --- is one more base functor.
+From [[orgit-file:include/beman/tree_algorithms/rose_tree.hpp][=include/beman/tree_algorithms/rose_tree.hpp=]]:
+
+#+transclude: [[file:../include/beman/tree_algorithms/rose_tree.hpp::8f0e2d0a-5c1f-4be4-9f1e-3b7a8c92d461]]  :lines 2- :src cpp :end "8f0e2d0a-5c1f-4be4-9f1e-3b7a8c92d461 end"
+
+No ~Box~ this time: ~std::vector~ supports incomplete element types and already owns through indirection, so the knot ties with no extra plumbing.
+~RoseTreeFix<T>~ is not a conversion target; it is the representation.
+The same ~fold_fix~, ~unfold_fix~, and ~fold_map~ run over it unchanged.
+
+But with a variable number of children there is no "between the children" position.
+In-order traversal does not exist for this shape.
+In-order is a /binary/ tree's contract, not a property of trees --- which is exactly why the generic ~fold_map~ leaves order to each layer's registered fold instead of imposing one:
+
+#+transclude: [[file:../include/beman/tree_algorithms/rose_tree.hpp::4b9d17f2-30a5-4e1c-b8d4-7f52a6c3e08d]]  :lines 2- :src cpp :end "4b9d17f2-30a5-4e1c-b8d4-7f52a6c3e08d end"
+
+The test suite makes the point concrete: the same ~fold_map~ call over the same three values yields ~"123"~ through the binary layer (in-order, its contract) and ~"213"~ through the rose layer (pre-order, its contract).
+Neither is wrong.
+There is no generic in-order to be right about.
+Pre-order and post-order generalize --- every layer has a before-children moment and an after-children moment.
+In-order does not.
+
 * The Bigger Picture
 
 This fixpoint expression tree is the simplest tree in the repository.
 It exists to demonstrate the pattern cleanly.
 
-The same ~functor_typeclass~ lookup and the same three verbs work unchanged over the binary tree adapter above, and over any other recursive representation that can present itself one layer at a time.
-An algorithm written against ~fold_fix~ does not change when the representation changes.
+The repository now exercises the verbs over five recursive representations: the expression tree, the ~shared_ptr~ binary tree (by conversion and directly), the move-only nonce tree, the rose tree, and a fringe tree with cached measures --- values at the leaves, O(1) concatenation by structural sharing, served directly with no ~Fix~ form at all.
+There is also a full working binary search tree built on ~Fix~ itself, in [[orgit-file:examples/search_tree_on_fix.cpp][=examples/search_tree_on_fix.cpp=]]: ~unfold_fix~ builds it balanced from a sorted range, ~fold_map~ flattens it back out sorted, and insert, contains, and erase are plain structural recursion over ~wrap_fix~ and ~unwrap_fix~.
+Search prunes; folds visit everything; ~Fix~ does not take ordinary recursion away.
+An algorithm written against the verbs does not change when the representation changes.
 That is the payoff.
 
 ~Fix~ ties the knot.
 ~fold_fix~ folds bottom-up.
 ~unfold_fix~ builds a tree from a seed.
 ~refold~ folds without materializing the tree.
+~fold_with~ and ~unfold_with~ do the same over a tree in its own representation.
+~fold_map~ folds the elements and derives the everyday queries.
 
-There is more to say --- Foldable derives a whole family of everyday operations from one hook, and Traversable rebuilds a tree inside an Applicative context so a validation either succeeds everywhere or returns nothing [cite:@gibbons2006iterator] [cite:@mcbride2008applicative].
+There is more to say --- Traversable rebuilds a tree inside an Applicative context so a validation either succeeds everywhere or returns nothing [cite:@gibbons2006iterator] [cite:@mcbride2008applicative], and sequence-shaped trees admit a whole vocabulary of algorithms that never see a shape at all, only the element sequence ([[orgit-file:examples/sequence_algorithms.cpp][=examples/sequence_algorithms.cpp=]] is the preview).
 Those build on exactly the machinery shown here, and they get their own article.
 
 Once you see it here, you see it everywhere.

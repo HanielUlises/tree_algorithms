@@ -3,7 +3,8 @@
 Date: 2026-07-13.
 Scope: what remains to extract from `~/src/trees/main`, how the pieces
 distribute across the coordinated proposal set, and the outline delta for
-the Paper D draft (`papers/DnnnnR0-recursive-tree-algorithms.md`).
+the Paper D draft (now `papers/algorithms-for-trees.md`;
+`DnnnnR0` at the time this plan was written).
 Sources surveyed for this plan: `trees/main` (origin/pedagogy repo,
 including `docs/notes/standardization-inverted-triangle-plan.md`),
 `transpose/transpose` (beman.transpose, D3200R0), `fixpoint/main`
@@ -16,7 +17,7 @@ Paper C), and this repository.
 |-------|------|-------|------|
 | Traversal, transposition, bundled customization | `~/src/transpose/transpose` | P3200 / D3200R0 (Paper A) | The mechanism: typeclass-object lookup, `Functor`/`Foldable`/`Applicative`/`Traversable`/`Monad` CRTP bases, `traverse`, `transpose`, `invoke`, `Monoid` customization point |
 | Persistent measured sequence | `~/src/fingertree/main` | Paper C (unnumbered) | The container: FingerTree, measures, monoid-tagged split/search, allocator/PMR story |
-| Recursive tree algorithms | this repo | Paper D (`DnnnnR0`) | The verbs: `fold_fix`/`unfold_fix`/`refold`, `Fix`/`Box` as exposition, adapters proving the verbs across representations |
+| Recursive tree algorithms | this repo | Paper D (`D4322R0`) | The verbs: `fold_fix`/`unfold_fix`/`refold`, `Fix`/`Box` as exposition, adapters proving the verbs across representations |
 | Recursion-scheme catalog (evidence only) | `~/src/fixpoint/main` | none — deliberately unproposed | para/apo/zygo/histo/futu/…, distributive laws, gcata/gana/ghylo; the proof that the three proposed verbs are the stable primitive layer |
 | Origin / pedagogy | `~/src/trees/main` | CppNow26 talk | The source everything above was extracted from; extraction is one-way |
 
@@ -306,7 +307,7 @@ publish where all three papers can cite one stable URL.
   carries a one-sentence Monad acknowledgment (see §8).
 - Paper C cites the essay from its companion section when drafted.
 
-## 8. Paper outline delta for DnnnnR0
+## 8. Paper outline delta for the D paper (now D4322R0)
 
 New/changed sections, in document order:
 

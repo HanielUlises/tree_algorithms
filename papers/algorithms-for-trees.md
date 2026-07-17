@@ -1,7 +1,7 @@
 ---
-title: "Recursive Tree Algorithms"
-document: DnnnnR0
-date: 2026-07-14
+title: "Algorithms for Trees"
+document: D4322R0
+date: 2026-07-17
 audience: LEWGI, LEWG
 author:
   - name: Steve Downey
@@ -119,7 +119,7 @@ This paper proposes one small family, in three groups:
 
 This paper explicitly does **not** propose a standard tree container or tree vocabulary type.
 Prematurely standardizing one blessed tree layout would be both harder to agree on and less useful than the algorithms, because the algorithms work across representations users already have.
-The motivating examples in the reference implementation span four recursive-tree representations, two of which are served with no fixed-point machinery at all (see [Implementation experience](#implementation-experience)).
+The motivating examples in the reference implementation span five recursive-tree representations, two of which are served with no fixed-point machinery at all (see [Implementation experience](#implementation-experience)).
 
 This paper does not depend on the persistent-sequence container paper (Paper C in the coordinated set; see [Relationship to companion papers](#relationship-to-companion-papers)).
 It consumes, but does not respecify, the bundled-customization mechanism of P3200 (Paper A) in an optional convenience layer.
@@ -145,6 +145,18 @@ The has-a formulation says only what is true, and the wrapping is zero cost.
 Recursive positions inside base-functor alternatives are held through `Box<A>`, a constexpr-capable, nullable, deep-copying owning pointer, so that `F<X>` is a complete type even for incomplete `X`.
 `std::indirect` has the right semantics for this job, and it is the plausible future spelling; the reference implementation stays with a hand-rolled `Box` because `std::indirect`'s explicit default constructor blocks use in aggregate-initialized containers, and because depending on it would raise the implementation floor to C++26 library support.
 In this paper both `Fix` and `Box` are exposition-level implementation detail: they are how the reference implementation demonstrates the algorithms, not names this paper asks LEWG to bless as user-facing vocabulary.
+
+## Building on Fix directly
+
+Exposition-level does not mean toy.
+The subsections below treat the fixed-point wrapper as an adapter target for trees that already exist; it is equally a representation a user can build on from the start, and the reference implementation includes a full working container that does: a binary search tree whose tree type is `Fix` over a binary base functor directly, with a disengaged `Box` doing double duty as both "empty tree" and "absent child" (`examples/search_tree_on_fix.cpp`).
+
+The example's value to this paper is its honest division of labor.
+`unfold_fix` builds the tree balanced from a sorted range; `fold_fix` and `fold_map` implement the whole-tree consumers — flatten, height, shape.
+But insert, contains, and erase are plain structural recursion written with `wrap_fix` and `unwrap_fix`, because search *prunes*: it descends one child and ignores the other, while a fold visits everything.
+The fixed-point machinery does not take ordinary recursion away, and the proposed verbs do not pretend to subsume it.
+(The literature's pruning and short-circuiting schemes — paramorphisms and apomorphisms — exist in the evidence catalog precisely for such operations; they remain deliberately unproposed. See [Non-goals](#non-goals).)
+The whole lifecycle — insert, search, erase, flatten — is exercised at compile time in a `static_assert`.
 
 ## Explicit `fmap`: the primary API
 
@@ -213,8 +225,9 @@ verbatim, the following anchored regions in beman.tree_algorithms:
 Checked against: manually diffed against the headers above on 2026-07-06
 (three verbs) and 2026-07-14 (fold family additions); identical modulo
 trailing semicolons (this is a declaration-only synopsis) and line
-wrapping. Re-diff before every revision that touches these headers,
-since drift here will not be caught by the build.
+wrapping. Carried into D4322R0 on 2026-07-17 with no header signature
+changes since the 2026-07-14 diff. Re-diff before every revision that
+touches these headers, since drift here will not be caught by the build.
 -->
 ```cpp
 namespace beman::tree_algorithms {
@@ -340,9 +353,23 @@ folds one layer, combining that layer's mapped elements with the
 already-folded child results in the representation's contractual
 traversal order.
 Traversal order is part of each instance's contract — in-order for the
-value-at-every-node binary tree, sequence order for the fringe tree —
-and the test policy pins it with non-commutative combines (string
-concatenation), under which a wrong order is a wrong answer.
+value-at-every-node binary tree, sequence order for the fringe tree,
+pre-order for the rose tree — and the test policy pins it with
+non-commutative combines (string concatenation), under which a wrong
+order is a wrong answer.
+
+Order belongs to the instance because no generic order exists to impose.
+A rose tree — a value and any number of children — has no "between the
+children" position, so in-order traversal does not exist for that shape;
+in-order is the binary layer's contract, not a property of trees.
+The reference implementation pins the consequence in a test: the same
+`fold_map` call over the same three values yields `"123"` through the
+binary layer and `"213"` through the rose layer, and neither is wrong,
+because there is no generic in-order to be right about.
+Pre-order and post-order do generalize — every layer has a
+before-children and an after-children moment — so a future generic
+traversal surface could offer those.
+Never in-order.
 
 The derivation is the implementation, and that is the point: `fold_map`
 over a fixed-point tree *is* `fold_fix` with an algebra that combines
@@ -351,6 +378,13 @@ projected tree *is* `fold_with` with the same algebra.
 Elementwise folding is derived from the structural verbs, not parallel
 machinery — evidence that the small proposed core is the right primitive
 layer.
+The derivations continue past this paper's surface: the classic
+Foldable operations (`fold_left` and its family) derive from `fold_map`
+by folding elements into accumulator-transforming programs, exactly as
+Haskell's `Data.Foldable` derives `foldl` from `foldMap`; the reference
+implementation demonstrates the derivation, and the coordinated set
+keeps those derived operations with the Foldable surface rather than
+respecifying them here.
 
 What counts as an element is the instance's choice, not the framework's.
 The expression tree's elements are its constants: summing the constants
@@ -423,10 +457,11 @@ The suffix reads consistently across the coordinated set, where `_with` marks "t
 
 Two implementations back this paper.
 
-**`beman.tree_algorithms`** is the standardization-facing implementation: exactly the surface proposed here — `Fix`/`Box`, the six verbs in both their explicit and lookup tiers, the three consumer-stub lookup objects, and adapters demonstrating the verbs over four recursive representations:
+**`beman.tree_algorithms`** is the standardization-facing implementation: exactly the surface proposed here — `Fix`/`Box`, the six verbs in both their explicit and lookup tiers, the three consumer-stub lookup objects, and adapters demonstrating the verbs over five recursive representations:
 
-- the fixed-point expression tree (`Fix` over a variant base functor);
+- the fixed-point expression tree (`Fix` over a variant base functor), plus a full working binary search tree built on the same machinery (see [Building on Fix directly](#building-on-fix-directly));
 - a persistent value-at-every-node binary tree with `shared_ptr` children, served both by conversion (`to_fix`/`from_fix`) and directly (a projection reading the `shared_ptr` spine in place), with a test pinning that both routes fold the same tree to the same answer;
+- a rose (multiway) tree, `Fix`-native: one base functor holding a value and a `std::vector` of children — no `Box` at all, because `vector` supports incomplete element types and already owns through indirection — whose layer fold contracts pre-order, the shape for which in-order does not exist;
 - a fringe tree — values at leaves, branches carrying a cached measure (leaf count), O(1) concatenation by structural sharing — served *directly only*: its layer holds children by value, no `Fix` form exists for it, and its embedding routes through the measure-computing constructor, so every tree `unfold_with` builds carries correct cached measures by construction;
 - a nonce tree with `std::unique_ptr` children — move-only, uncopyable, folded and built in place through three small ingredients.
 
@@ -445,7 +480,7 @@ We are upfront about the costs of this design; they are better stated by the aut
 The library chooses value semantics throughout — layers are passed by value, `Box` deep-copies, and there is no sharing or memoization — and the abstraction itself has two costs beyond the copies.
 First, compile time: C++ lacks higher-kinded types, so the `fmap` that `fold_fix` requires is emulated by template machinery, and the compiler performs deep, recursive template instantiation to type-check each scheme at each carrier type.
 Across a large codebase this instantiation overhead can measurably degrade build latency.
-<!-- MEASURE: no compile-time numbers exist for beman.tree_algorithms; the claim is qualitative, from the source cost analysis. Re-measure (e.g. -ftime-trace) before P-numbering. -->
+<!-- MEASURE: no compile-time numbers exist for beman.tree_algorithms; the claim is qualitative, from the source cost analysis. Re-measure (e.g. -ftime-trace) before publication. -->
 
 Second, code generation: a hand-written `std::visit` traversal compiles to a jump table or switch with O(1) dispatch, whereas a recursion scheme relies entirely on the optimizer to inline the generic traversal, the algebra, and the `Box` unwrapping into an equivalent loop.
 When the structure's nesting exceeds inlining thresholds, the result is larger object code and runtime pointer-chasing rather than a fused traversal.
@@ -491,6 +526,7 @@ The elementwise fold proposed here and the effectful traversal proposed there ar
 **Paper C (persistent measured sequence)**: an independently motivated container proposal.
 There is no normative dependence in either direction; persistent tree structures are simply one more recursive representation the algorithms here can serve.
 The fringe tree in this paper's reference implementation — a cached measure maintained through its embedding — is the miniature of Paper C's monoid-tagged-structure idea, and the shared `Monoid` vocabulary (`identity`/`combine`) is kept aligned across the coordinated set.
+The Foldable derivations sit on the same boundary: `fold_map` is the primitive this paper proposes, and the operations that derive from it (`fold_left` and its family) live with the Foldable surfaces in the companion repositories — one definition each, derived, never respecified here.
 
 **Monad, deferred**: no paper in the coordinated set proposes a Monad abstraction — deferred, not rejected.
 The typeclass design points toward a consistent generic name for sequential composition eventually (today's `and_then`/`transform`/`let_value` are per-type members, not generic), and the mechanism demonstrably carries it; it is simply not needed by anything proposed — the verbs here fold and build, and the traversal paper composes independent contexts.
@@ -506,6 +542,7 @@ Only the lookup-based convenience overloads are contingent on P3200's facility.
 - P3200, the companion traversal/transposition and bundled-customization paper (Paper A of this coordinated set).
 - Haskell `data-fix` 0.3.4, `Data.Fix`: `foldFix`/`unfoldFix`/`refold` naming precedent. <https://hackage.haskell.org/package/data-fix-0.3.4/docs/Data-Fix.html>
 - Haskell `base`, `Data.Foldable`: the `foldMap` naming and derivation precedent for `fold_map`. <https://hackage.haskell.org/package/base/docs/Data-Foldable.html>
+- Haskell `containers`, `Data.Tree`: the rose-tree precedent. <https://hackage.haskell.org/package/containers/docs/Data-Tree.html>
 - Edward Kmett, `recursion-schemes` (Haskell package): the extended catalog implemented as evidence. <https://hackage.haskell.org/package/recursion-schemes>
 - Erik Meijer, Maarten Fokkinga, Ross Paterson, *Functional Programming with Bananas, Lenses, Envelopes and Barbed Wire*, FPCA 1991.
 - Steve Downey, *Concept Maps Using C++23 Library Tech*. <https://sdowney.org/posts/index.php/2024/05/19/concept-maps-using-c23-library-tech/>
