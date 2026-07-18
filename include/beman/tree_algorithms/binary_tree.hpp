@@ -12,6 +12,7 @@ import beman.tree_algorithms;
 #else
 
     #include <beman/tree_algorithms/box.hpp>
+    #include <beman/tree_algorithms/child_slot.hpp>
     #include <beman/tree_algorithms/fix.hpp>
     #include <beman/tree_algorithms/fold_map_lookup.hpp>
     #include <beman/tree_algorithms/functor.hpp>
@@ -40,8 +41,9 @@ namespace beman::tree_algorithms {
 //
 // Design choice: rather than rewrite the tree, we adapt it. BinaryTreeF
 // is the base functor describing one layer of a value-at-every-node
-// binary tree (nullable Box children mirror the tree's nullable
-// shared_ptr children), with a Functor instance registered for it, and
+// binary tree (nullable child slots mirror the tree's nullable
+// shared_ptr children; see child_slot.hpp — Box at the knot, inline
+// storage at complete types), with a Functor instance registered for it, and
 // to_fix/from_fix convert between the shared_ptr representation and
 // Fix form. The same fold_fix/unfold_fix/refold that run over ExprF run
 // unchanged over the converted tree; only the adapter knows how the tree
@@ -136,16 +138,19 @@ class BinaryTree {
 
 // 27aeff53-a371-43b6-9037-135d5d008c26
 /** One layer of a value-at-every-node binary tree: a value plus nullable
- * boxed children. A disengaged (null) Box mirrors an absent child, exactly
- * as a null shared_ptr does in BinaryTree.
+ * children in child slots. A disengaged slot mirrors an absent child,
+ * exactly as a null shared_ptr does in BinaryTree. The slot is a Box
+ * exactly when A is the fixed point (the knot, where A is incomplete)
+ * and inline std::optional storage at every complete type — so the
+ * F<Result> layers a fold materializes allocate nothing.
  * @tparam T element type stored at every node
  * @tparam A recursive position placeholder (not yet fixed)
  */
 template <typename T, typename A>
 struct BinaryTreeF {
-    T      value;
-    Box<A> left;
-    Box<A> right;
+    T               value;
+    child_slot_t<A> left;
+    child_slot_t<A> right;
 };
 
 /** Binds the element type of BinaryTreeF, leaving the unary-in-A alias
@@ -167,8 +172,9 @@ using BinaryTreeFix = Fix<BinaryTreeLayer<T>::template F>;
 
 // 91fef612-39b5-4424-8ab5-7d8c80997e2c
 /** Functor primitive for BinaryTreeF<T, A>: applies @p fn to each engaged
- * child, left before right; absent (null Box) children stay absent. The
- * node value copies across untouched.
+ * child, left before right; absent (disengaged) children stay absent. The
+ * node value copies across untouched. make_slot picks the result layer's
+ * storage: inline for complete B, boxed only if B is itself the knot.
  */
 template <typename T, typename A>
 struct BinaryTreeFFunctorImpl {
@@ -177,8 +183,8 @@ struct BinaryTreeFFunctorImpl {
         using B = std::remove_cvref_t<std::invoke_result_t<Fn, const A&> >;
         return BinaryTreeF<T, B>{
             layer.value,
-            layer.left.ptr ? make_box<B>(std::invoke(fn, *layer.left)) : Box<B>{},
-            layer.right.ptr ? make_box<B>(std::invoke(fn, *layer.right)) : Box<B>{},
+            layer.left ? make_slot<B>(std::invoke(fn, *layer.left)) : child_slot_t<B>{},
+            layer.right ? make_slot<B>(std::invoke(fn, *layer.right)) : child_slot_t<B>{},
         };
     }
 };
@@ -213,8 +219,8 @@ struct BinaryTreeLayerFoldMap {
                               const Combine&                combine,
                               const Result&                 identity,
                               const BinaryTreeF<T, Result>& layer) const -> Result {
-        Result left  = layer.left.ptr ? *layer.left : identity;
-        Result right = layer.right.ptr ? *layer.right : identity;
+        Result left  = layer.left ? *layer.left : identity;
+        Result right = layer.right ? *layer.right : identity;
         return combine(combine(left, map_fn(layer.value)), right);
     }
 };
@@ -229,14 +235,16 @@ inline constexpr BinaryTreeLayerFoldMap binary_tree_layer_fold_map{};
 // c9e514d9-4cf1-4fa1-ac4d-a9dfdf040291
 /** Projection for the direct verbs: exposes one layer of a BinaryTree,
  * children as raw non-owning pointers read from the shared_ptr spine in
- * place — no conversion, no structure copied beyond one layer. */
+ * place — no conversion, no structure copied beyond one layer. The
+ * pointer handles are complete types, so their slots are inline: the
+ * projected layer allocates nothing. */
 struct BinaryTreeProjectFn {
     template <typename T>
     auto operator()(const BinaryTree<T>* t) const -> BinaryTreeF<T, const BinaryTree<T>*> {
         using P = const BinaryTree<T>*;
         return BinaryTreeF<T, P>{t->value(),
-                                 t->has_left() ? make_box<P>(&t->left()) : Box<P>{},
-                                 t->has_right() ? make_box<P>(&t->right()) : Box<P>{}};
+                                 t->has_left() ? make_slot<P>(&t->left()) : child_slot_t<P>{},
+                                 t->has_right() ? make_slot<P>(&t->right()) : child_slot_t<P>{}};
     }
 };
 
@@ -245,10 +253,10 @@ inline constexpr BinaryTreeProjectFn binary_tree_project{};
 /** Lookup registrations: the projection keyed on the tree type, the
  * layer fold keyed on the layer type. */
 template <typename T>
-inline constexpr auto project_typeclass<BinaryTree<T>> = binary_tree_project;
+inline constexpr auto project_typeclass<BinaryTree<T> > = binary_tree_project;
 
 template <typename T, typename A>
-inline constexpr auto layer_fold_typeclass<BinaryTreeF<T, A>> = binary_tree_layer_fold_map;
+inline constexpr auto layer_fold_typeclass<BinaryTreeF<T, A> > = binary_tree_layer_fold_map;
 // c9e514d9-4cf1-4fa1-ac4d-a9dfdf040291 end
 
 // ---------------------------------------------------------------------
@@ -263,8 +271,8 @@ auto to_fix(const BinaryTree<T>& tree) -> BinaryTreeFix<T> {
     using Fixed = BinaryTreeFix<T>;
     return wrap_fix<BinaryTreeLayer<T>::template F>(
         BinaryTreeF<T, Fixed>{tree.value(),
-                              tree.has_left() ? make_box<Fixed>(to_fix(tree.left())) : Box<Fixed>{},
-                              tree.has_right() ? make_box<Fixed>(to_fix(tree.right())) : Box<Fixed>{}});
+                              tree.has_left() ? make_slot<Fixed>(to_fix(tree.left())) : child_slot_t<Fixed>{},
+                              tree.has_right() ? make_slot<Fixed>(to_fix(tree.right())) : child_slot_t<Fixed>{}});
 }
 
 /** Extracts the element type from a BinaryTreeF layer type; T is a
@@ -286,8 +294,8 @@ auto from_fix(const Fix<F>& fixed) -> BinaryTree<typename binary_tree_element<F<
     using T              = typename binary_tree_element<F<Fix<F> > >::type;
     auto rebuild_algebra = [](const BinaryTreeF<T, BinaryTree<T> >& layer) -> BinaryTree<T> {
         return BinaryTree<T>::from_children_ptrs(layer.value,
-                                                 layer.left.ptr ? BinaryTree<T>::make_ptr(*layer.left) : nullptr,
-                                                 layer.right.ptr ? BinaryTree<T>::make_ptr(*layer.right) : nullptr);
+                                                 layer.left ? BinaryTree<T>::make_ptr(*layer.left) : nullptr,
+                                                 layer.right ? BinaryTree<T>::make_ptr(*layer.right) : nullptr);
     };
     return fold_fix<BinaryTree<T> >(rebuild_algebra, fixed);
 }

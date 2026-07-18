@@ -12,6 +12,7 @@ import beman.tree_algorithms;
 #else
 
     #include <beman/tree_algorithms/box.hpp>
+    #include <beman/tree_algorithms/child_slot.hpp>
     #include <beman/tree_algorithms/fix.hpp>
     #include <beman/tree_algorithms/fold_map_lookup.hpp>
     #include <beman/tree_algorithms/functor.hpp>
@@ -48,17 +49,18 @@ struct Const {
     int val;
 };
 
-/** Addition node alternative; holds boxed left and right sub-expressions. */
+/** Addition node alternative; left and right sub-expressions in child
+ * slots — boxed at the knot, inline at complete types. */
 template <typename A>
 struct Add {
-    Box<A> left, right;
+    child_slot_t<A> left, right;
 };
 
-/** Multiplication node alternative; holds boxed left and right
- * sub-expressions. */
+/** Multiplication node alternative; left and right sub-expressions in
+ * child slots. */
 template <typename A>
 struct Mul {
-    Box<A> left, right;
+    child_slot_t<A> left, right;
 };
 
 /** Non-recursive expression base functor: one layer of an expression tree
@@ -87,10 +89,10 @@ struct ExprFFunctorImpl {
             overloaded{
                 [](const Const<A>& c) -> ExprF<B> { return Const<B>{c.val}; },
                 [&fn](const Add<A>& a) -> ExprF<B> {
-                    return Add<B>{make_box<B>(std::invoke(fn, *a.left)), make_box<B>(std::invoke(fn, *a.right))};
+                    return Add<B>{make_slot<B>(std::invoke(fn, *a.left)), make_slot<B>(std::invoke(fn, *a.right))};
                 },
                 [&fn](const Mul<A>& m) -> ExprF<B> {
-                    return Mul<B>{make_box<B>(std::invoke(fn, *m.left)), make_box<B>(std::invoke(fn, *m.right))};
+                    return Mul<B>{make_slot<B>(std::invoke(fn, *m.left)), make_slot<B>(std::invoke(fn, *m.right))};
                 },
             },
             layer);
@@ -122,12 +124,12 @@ constexpr auto const_node(int v) -> Expr { return wrap_fix<ExprF>(ExprF<Expr>{Co
 
 /** Build @p l + @p r. */
 constexpr auto add_node(Expr l, Expr r) -> Expr {
-    return wrap_fix<ExprF>(ExprF<Expr>{Add<Expr>{make_box<Expr>(std::move(l)), make_box<Expr>(std::move(r))}});
+    return wrap_fix<ExprF>(ExprF<Expr>{Add<Expr>{make_slot<Expr>(std::move(l)), make_slot<Expr>(std::move(r))}});
 }
 
 /** Build @p l * @p r. */
 constexpr auto mul_node(Expr l, Expr r) -> Expr {
-    return wrap_fix<ExprF>(ExprF<Expr>{Mul<Expr>{make_box<Expr>(std::move(l)), make_box<Expr>(std::move(r))}});
+    return wrap_fix<ExprF>(ExprF<Expr>{Mul<Expr>{make_slot<Expr>(std::move(l)), make_slot<Expr>(std::move(r))}});
 }
 // d0f9b5a2-363f-49ca-9a37-bfb0e6c9ff50 end
 
@@ -164,9 +166,9 @@ inline constexpr auto eval_algebra = [](const ExprF<int>& expr) -> int {
  */
 struct ExprLayerFoldMap {
     template <typename MapFn, typename Combine, typename Result>
-    constexpr auto operator()(const MapFn&         map_fn,
-                              const Combine&       combine,
-                              const Result&        /*identity*/,
+    constexpr auto operator()(const MapFn&   map_fn,
+                              const Combine& combine,
+                              const Result& /*identity*/,
                               const ExprF<Result>& layer) const -> Result {
         return std::visit(overloaded{
                               [&](const Const<Result>& c) -> Result { return map_fn(c.val); },
@@ -181,7 +183,7 @@ inline constexpr ExprLayerFoldMap expr_layer_fold_map{};
 
 /** Lookup registration for the ExprF layer fold. */
 template <typename A>
-inline constexpr auto layer_fold_typeclass<ExprF<A>> = expr_layer_fold_map;
+inline constexpr auto layer_fold_typeclass<ExprF<A> > = expr_layer_fold_map;
 // 8f25579d-443a-4685-b3af-01f8103f6863 end
 
 // 66235297-8e2a-4610-b6a4-a3f2a8837fb0

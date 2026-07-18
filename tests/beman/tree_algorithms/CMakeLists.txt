@@ -29,7 +29,10 @@ if(BEMAN_TREE_ALGORITHMS_USE_MODULES)
 endif()
 
 add_executable(beman.tree_algorithms.tests.fringe_tree)
-target_sources(beman.tree_algorithms.tests.fringe_tree PRIVATE fringe_tree.test.cpp)
+target_sources(
+    beman.tree_algorithms.tests.fringe_tree
+    PRIVATE fringe_tree.test.cpp
+)
 target_link_libraries(
     beman.tree_algorithms.tests.fringe_tree
     PRIVATE beman::tree_algorithms Catch2::Catch2WithMain
@@ -50,6 +53,22 @@ target_link_libraries(
 if(BEMAN_TREE_ALGORITHMS_USE_MODULES)
     set_target_properties(
         beman.tree_algorithms.tests.box
+        PROPERTIES CXX_MODULE_STD ON
+    )
+endif()
+
+add_executable(beman.tree_algorithms.tests.child_slot)
+target_sources(
+    beman.tree_algorithms.tests.child_slot
+    PRIVATE child_slot.test.cpp
+)
+target_link_libraries(
+    beman.tree_algorithms.tests.child_slot
+    PRIVATE beman::tree_algorithms Catch2::Catch2WithMain
+)
+if(BEMAN_TREE_ALGORITHMS_USE_MODULES)
+    set_target_properties(
+        beman.tree_algorithms.tests.child_slot
         PROPERTIES CXX_MODULE_STD ON
     )
 endif()
@@ -174,10 +193,7 @@ if(BEMAN_TREE_ALGORITHMS_USE_MODULES)
 endif()
 
 add_executable(beman.tree_algorithms.tests.rose_tree)
-target_sources(
-    beman.tree_algorithms.tests.rose_tree
-    PRIVATE rose_tree.test.cpp
-)
+target_sources(beman.tree_algorithms.tests.rose_tree PRIVATE rose_tree.test.cpp)
 target_link_libraries(
     beman.tree_algorithms.tests.rose_tree
     PRIVATE beman::tree_algorithms Catch2::Catch2WithMain
@@ -204,6 +220,7 @@ endif()
 include(Catch)
 catch_discover_tests(beman.tree_algorithms.tests.todo)
 catch_discover_tests(beman.tree_algorithms.tests.box)
+catch_discover_tests(beman.tree_algorithms.tests.child_slot)
 catch_discover_tests(beman.tree_algorithms.tests.fix)
 catch_discover_tests(beman.tree_algorithms.tests.overloaded)
 catch_discover_tests(beman.tree_algorithms.tests.recursion_schemes)

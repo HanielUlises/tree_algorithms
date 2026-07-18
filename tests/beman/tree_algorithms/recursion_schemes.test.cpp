@@ -462,17 +462,14 @@ TEST_CASE("FoldWith - NonceTreeShape", "[tree_algorithms::recursion_schemes]") {
     //      2   3
     //     . .
     //    4   5
-    auto tree =
-        nonce_node(1, nonce_node(2, nonce_leaf(4), nonce_leaf(5)), nonce_leaf(3));
+    auto tree = nonce_node(1, nonce_node(2, nonce_leaf(4), nonce_leaf(5)), nonce_leaf(3));
 
     auto shape = fold_with<std::string>(nonce_shape_algebra, fmap_nonce_fn, nonce_project, tree.get());
     CHECK(shape == "(((. 4 .) 2 (. 5 .)) 1 (. 3 .))");
 
     // Mirrored tree must give the mirrored string (DEV-01 order check).
-    auto mirrored =
-        nonce_node(1, nonce_leaf(3), nonce_node(2, nonce_leaf(5), nonce_leaf(4)));
-    auto mirrored_shape =
-        fold_with<std::string>(nonce_shape_algebra, fmap_nonce_fn, nonce_project, mirrored.get());
+    auto mirrored       = nonce_node(1, nonce_leaf(3), nonce_node(2, nonce_leaf(5), nonce_leaf(4)));
+    auto mirrored_shape = fold_with<std::string>(nonce_shape_algebra, fmap_nonce_fn, nonce_project, mirrored.get());
     CHECK(mirrored_shape == "((. 3 .) 1 ((. 5 .) 2 (. 4 .)))");
 }
 

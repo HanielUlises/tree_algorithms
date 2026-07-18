@@ -22,27 +22,44 @@ namespace beman::tree_algorithms {
  * Fix<F> is the iso-recursive type satisfying Fix<F> ≅ F<Fix<F>>.
  * The single data member @c inner holds one unwrapped layer; wrap/unwrap
  * are the iso-recursive isomorphism boundary.
- * Use Box<Fix<F>> inside F to avoid infinite template instantiation depth.
+ * F's recursive positions need indirection only here, where Fix<F> is
+ * incomplete — hold them in child_slot_t (child_slot.hpp), which is a Box
+ * exactly at the knot and inline storage at every complete type.
  * @tparam F unary template functor (takes the recursive position as its param)
  */
 // 57d4bd6e-c8c7-4806-afd3-2e42aec8ae27
 template <template <typename> class F>
 struct Fix {
-    F<Fix<F>> inner;
+    F<Fix<F> > inner;
 };
 // 57d4bd6e-c8c7-4806-afd3-2e42aec8ae27 end
 
 // 53775b7e-8a78-4b79-885b-046f6232d7a3
-/** Wrap one layer of @p F into the fixed-point type. */
+/** Wrap one layer of @p F into the fixed-point type, consuming the
+ * layer: one move, whether the argument is a prvalue or an xvalue. */
 template <template <typename> class F>
-constexpr auto wrap_fix(F<Fix<F>> layer) -> Fix<F> {
+constexpr auto wrap_fix(F<Fix<F> >&& layer) -> Fix<F> {
     return Fix<F>{std::move(layer)};
 }
 
-/** Unwrap one layer from a fixed-point value, exposing F<Fix<F>>. */
+/** Wrap a layer the caller keeps: one copy into the fixed point. */
 template <template <typename> class F>
-constexpr auto unwrap_fix(const Fix<F>& fixed) -> const F<Fix<F>>& {
+constexpr auto wrap_fix(const F<Fix<F> >& layer) -> Fix<F> {
+    return Fix<F>{layer};
+}
+
+/** Unwrap one layer from a fixed-point value, exposing F<Fix<F>>.
+ * Reads in place: no copy, no move. */
+template <template <typename> class F>
+constexpr auto unwrap_fix(const Fix<F>& fixed) -> const F<Fix<F> >& {
     return fixed.inner;
+}
+
+/** Unwrap an owned (rvalue) fixed-point value, exposing the layer as an
+ * rvalue so a consuming caller can move parts out of it. */
+template <template <typename> class F>
+constexpr auto unwrap_fix(Fix<F>&& fixed) -> F<Fix<F> >&& {
+    return std::move(fixed.inner);
 }
 // 53775b7e-8a78-4b79-885b-046f6232d7a3 end
 

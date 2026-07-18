@@ -71,11 +71,11 @@ inline constexpr bool has_project_instance =
 template <class MapFn, class Combine, class Result, class Layer>
 constexpr auto layer_fold_map(const MapFn& map_fn, const Combine& combine, const Result& identity, const Layer& layer)
     -> Result {
-    static_assert(has_layer_fold_instance<std::remove_cvref_t<Layer>>,
+    static_assert(has_layer_fold_instance<std::remove_cvref_t<Layer> >,
                   "no layer-fold instance: specialize "
                   "beman::tree_algorithms::layer_fold_typeclass for this layer type, or use "
                   "the explicit forms in fold_map.hpp");
-    return layer_fold_typeclass<std::remove_cvref_t<Layer>>(map_fn, combine, identity, layer);
+    return layer_fold_typeclass<std::remove_cvref_t<Layer> >(map_fn, combine, identity, layer);
 }
 
 /** Elementwise fold over a Fix<F> tree, resolving the layer fold and the

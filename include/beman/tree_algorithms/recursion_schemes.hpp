@@ -140,9 +140,9 @@ constexpr auto fold_with(const Algebra& algebra, const FMap& fmap_fn, const Proj
 template <typename Tree, typename Coalgebra, typename FMap, typename Embed, typename Seed>
 constexpr auto unfold_with(const Coalgebra& coalgebra, const FMap& fmap_fn, const Embed& embed, const Seed& seed)
     -> Tree {
-    auto layer    = coalgebra(seed);
-    auto expanded = fmap_fn(
-        [&](const auto& child) -> Tree { return unfold_with<Tree>(coalgebra, fmap_fn, embed, child); }, layer);
+    auto layer = coalgebra(seed);
+    auto expanded =
+        fmap_fn([&](const auto& child) -> Tree { return unfold_with<Tree>(coalgebra, fmap_fn, embed, child); }, layer);
     return embed(std::move(expanded));
 }
 // d160af7b-9a3c-4593-b8f5-fc1ff0404b37 end

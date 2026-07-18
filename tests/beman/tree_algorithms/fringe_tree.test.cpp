@@ -15,12 +15,12 @@
 
 using beman::tree_algorithms::fold_map;
 using beman::tree_algorithms::fold_with;
-using beman::tree_algorithms::FringeBranch;
-using beman::tree_algorithms::FringeEmpty;
-using beman::tree_algorithms::FringeLeaf;
 using beman::tree_algorithms::fringe_tree_embed;
 using beman::tree_algorithms::fringe_tree_layer_fold_map;
 using beman::tree_algorithms::fringe_tree_project;
+using beman::tree_algorithms::FringeBranch;
+using beman::tree_algorithms::FringeEmpty;
+using beman::tree_algorithms::FringeLeaf;
 using beman::tree_algorithms::FringeTree;
 using beman::tree_algorithms::FringeTreeF;
 using beman::tree_algorithms::functor_typeclass;
@@ -65,8 +65,8 @@ static_assert(has_functor_instance<FringeTreeF<int, int>>);
 
 constexpr auto fmap_doubles_branch_handles() -> bool {
     FringeTreeF<int, int> layer{FringeBranch<int>{3, 4}};
-    auto doubled = functor_typeclass<FringeTreeF<int, int>>.fmap([](const int& x) { return x * 2; }, layer);
-    const auto* b = std::get_if<FringeBranch<int>>(&doubled);
+    auto        doubled = functor_typeclass<FringeTreeF<int, int>>.fmap([](const int& x) { return x * 2; }, layer);
+    const auto* b       = std::get_if<FringeBranch<int>>(&doubled);
     return b != nullptr && b->left == 6 && b->right == 8;
 }
 
@@ -223,9 +223,13 @@ TEST_CASE("FringeTree - FoldMapConcatFollowsTheSequence", "[tree_algorithms::fri
     auto show   = [](int x) { return std::to_string(x); };
 
     auto run = [&](const Tree& t) {
-        return fold_map<std::string>(
-            show, concat, std::string{}, fringe_tree_layer_fold_map, fmap_fn, fringe_tree_project,
-            static_cast<Ptr>(&t));
+        return fold_map<std::string>(show,
+                                     concat,
+                                     std::string{},
+                                     fringe_tree_layer_fold_map,
+                                     fmap_fn,
+                                     fringe_tree_project,
+                                     static_cast<Ptr>(&t));
     };
 
     // DEV-01: the non-commutative monoid observes element order...
@@ -241,8 +245,18 @@ TEST_CASE("FringeTree - FoldMapConcatFollowsTheSequence", "[tree_algorithms::fri
     // Derived queries, one-liners as ever.
     auto plus = [](int a, int b) { return a + b; };
     auto t    = Tree::from_sequence({1, 2, 3, 4, 5});
-    CHECK(fold_map<int>([](int) { return 1; }, plus, 0, fringe_tree_layer_fold_map, fmap_fn, fringe_tree_project,
+    CHECK(fold_map<int>([](int) { return 1; },
+                        plus,
+                        0,
+                        fringe_tree_layer_fold_map,
+                        fmap_fn,
+                        fringe_tree_project,
                         static_cast<Ptr>(&t)) == 5);
-    CHECK(fold_map<int>([](int x) { return x; }, plus, 0, fringe_tree_layer_fold_map, fmap_fn, fringe_tree_project,
+    CHECK(fold_map<int>([](int x) { return x; },
+                        plus,
+                        0,
+                        fringe_tree_layer_fold_map,
+                        fmap_fn,
+                        fringe_tree_project,
                         static_cast<Ptr>(&t)) == 15);
 }

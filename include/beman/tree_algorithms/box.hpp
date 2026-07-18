@@ -37,9 +37,9 @@ struct Box {
 
     constexpr explicit Box(A* p) : ptr(p) {}
 
-    constexpr Box(Box const& other) : ptr(other.ptr ? new A(*other.ptr) : nullptr) {}
+    constexpr Box(const Box& other) : ptr(other.ptr ? new A(*other.ptr) : nullptr) {}
 
-    constexpr auto operator=(Box const& other) -> Box& {
+    constexpr auto operator=(const Box& other) -> Box& {
         if (this != &other) {
             delete ptr;
             ptr = other.ptr ? new A(*other.ptr) : nullptr;
@@ -62,7 +62,11 @@ struct Box {
     constexpr auto operator*() const -> A& { return *ptr; }
     constexpr auto operator->() const -> A* { return ptr; }
 
-    friend constexpr auto operator==(Box const& lhs, Box const& rhs) -> bool {
+    /** Engaged test, matching std::optional's contextual conversion so
+     * child_slot code reads the same whether the slot is boxed or inline. */
+    constexpr explicit operator bool() const { return ptr != nullptr; }
+
+    friend constexpr auto operator==(const Box& lhs, const Box& rhs) -> bool {
         if (lhs.ptr == rhs.ptr)
             return true;
         if (!lhs.ptr || !rhs.ptr)

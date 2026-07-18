@@ -18,12 +18,14 @@ using beman::tree_algorithms::BinaryTreeF;
 using beman::tree_algorithms::BinaryTreeFix;
 using beman::tree_algorithms::BinaryTreeLayer;
 using beman::tree_algorithms::Box;
+using beman::tree_algorithms::child_slot_t;
 using beman::tree_algorithms::fold_fix;
 using beman::tree_algorithms::fold_with;
 using beman::tree_algorithms::from_fix;
 using beman::tree_algorithms::functor_typeclass;
 using beman::tree_algorithms::has_functor_instance;
 using beman::tree_algorithms::make_box;
+using beman::tree_algorithms::make_slot;
 using beman::tree_algorithms::refold;
 using beman::tree_algorithms::to_fix;
 using beman::tree_algorithms::unfold_fix;
@@ -56,8 +58,8 @@ constexpr auto fmap_btree(Fn&& fn, const BinaryTreeF<int, A>& layer) {
     using B = std::remove_cvref_t<std::invoke_result_t<Fn, const A&>>;
     return BinaryTreeF<int, B>{
         layer.value,
-        layer.left.ptr ? make_box<B>(std::invoke(fn, *layer.left)) : Box<B>{},
-        layer.right.ptr ? make_box<B>(std::invoke(fn, *layer.right)) : Box<B>{},
+        layer.left ? make_slot<B>(std::invoke(fn, *layer.left)) : child_slot_t<B>{},
+        layer.right ? make_slot<B>(std::invoke(fn, *layer.right)) : child_slot_t<B>{},
     };
 }
 
@@ -68,10 +70,10 @@ inline constexpr auto fmap_btree_fn = [](auto&& fn, const auto& layer) {
 // In-order rendering algebra: "_" marks an absent child; the exact string
 // records shape, child order, and every node value (Decision 7).
 inline auto show_algebra = [](const BinaryTreeF<int, std::string>& layer) -> std::string {
-    if (!layer.left.ptr && !layer.right.ptr)
+    if (!layer.left && !layer.right)
         return std::to_string(layer.value);
-    return "(" + (layer.left.ptr ? *layer.left : std::string{"_"}) + " " + std::to_string(layer.value) + " " +
-           (layer.right.ptr ? *layer.right : std::string{"_"}) + ")";
+    return "(" + (layer.left ? *layer.left : std::string{"_"}) + " " + std::to_string(layer.value) + " " +
+           (layer.right ? *layer.right : std::string{"_"}) + ")";
 };
 
 // Non-commutative in-order numeric algebra: leaves yield their value;
@@ -79,14 +81,14 @@ inline auto show_algebra = [](const BinaryTreeF<int, std::string>& layer) -> std
 // contributing 0. Swapped children or a flipped visit order give a
 // different answer.
 inline constexpr auto subtract_algebra = [](const BinaryTreeF<int, int>& layer) -> int {
-    if (!layer.left.ptr && !layer.right.ptr)
+    if (!layer.left && !layer.right)
         return layer.value;
-    return ((layer.left.ptr ? *layer.left : 0) - layer.value) - (layer.right.ptr ? *layer.right : 0);
+    return ((layer.left ? *layer.left : 0) - layer.value) - (layer.right ? *layer.right : 0);
 };
 
 // DEV-01 non-idempotent algebra: every node contributes value - 1.
 inline constexpr auto decrement_sum_algebra = [](const BinaryTreeF<int, int>& layer) -> int {
-    return (layer.value - 1) + (layer.left.ptr ? *layer.left : 0) + (layer.right.ptr ? *layer.right : 0);
+    return (layer.value - 1) + (layer.left ? *layer.left : 0) + (layer.right ? *layer.right : 0);
 };
 
 // Balanced-BST coalgebra: seed [lo, hi) becomes the node mid = midpoint,
@@ -98,8 +100,8 @@ inline constexpr auto bst_coalgebra = [](const Range& r) -> BinaryTreeF<int, Ran
     auto [lo, hi] = r;
     int mid       = lo + (hi - lo) / 2;
     return BinaryTreeF<int, Range>{mid,
-                                   mid > lo ? make_box<Range>(Range{lo, mid}) : Box<Range>{},
-                                   hi > mid + 1 ? make_box<Range>(Range{mid + 1, hi}) : Box<Range>{}};
+                                   mid > lo ? make_slot<Range>(Range{lo, mid}) : child_slot_t<Range>{},
+                                   hi > mid + 1 ? make_slot<Range>(Range{mid + 1, hi}) : child_slot_t<Range>{}};
 };
 
 // ---------------------------------------------------------------------
@@ -251,8 +253,8 @@ TEST_CASE("BinaryTree - DirectFoldAgreesWithAdapterPath", "[tree_algorithms::bin
     using Ptr    = const IntTree*;
     auto project = [](Ptr t) -> BinaryTreeF<int, Ptr> {
         return BinaryTreeF<int, Ptr>{t->value(),
-                                     t->has_left() ? make_box<Ptr>(&t->left()) : Box<Ptr>{},
-                                     t->has_right() ? make_box<Ptr>(&t->right()) : Box<Ptr>{}};
+                                     t->has_left() ? make_slot<Ptr>(&t->left()) : child_slot_t<Ptr>{},
+                                     t->has_right() ? make_slot<Ptr>(&t->right()) : child_slot_t<Ptr>{}};
     };
 
     auto t = IntTree::node(1, IntTree::node(2, IntTree::leaf(4), IntTree::leaf(5)), IntTree::leaf(3));
@@ -270,18 +272,19 @@ TEST_CASE("BinaryTree - DirectFoldAgreesWithAdapterPath", "[tree_algorithms::bin
 TEST_CASE("BinaryTree - FmapPreservesAbsentChildrenAndValue", "[tree_algorithms::binary_tree]") {
     const auto& map = functor_typeclass<BinaryTreeF<int, int>>;
 
-    BinaryTreeF<int, int> layer{7, make_box<int>(1), Box<int>{}};
+    // int is complete, so the layer's child slots are inline optionals.
+    BinaryTreeF<int, int> layer{7, make_slot<int>(1), child_slot_t<int>{}};
 
     auto doubled = map.fmap([](const int& x) { return x * 2; }, layer);
     CHECK(doubled.value == 7);
-    REQUIRE(doubled.left.ptr != nullptr);
+    REQUIRE(doubled.left.has_value());
     CHECK(*doubled.left == 2);
-    CHECK(doubled.right.ptr == nullptr);
+    CHECK(!doubled.right.has_value());
 
     // Derived operation from the Functor CRTP base.
     auto replaced = map.replace(layer, 9);
     CHECK(replaced.value == 7);
-    REQUIRE(replaced.left.ptr != nullptr);
+    REQUIRE(replaced.left.has_value());
     CHECK(*replaced.left == 9);
-    CHECK(replaced.right.ptr == nullptr);
+    CHECK(!replaced.right.has_value());
 }

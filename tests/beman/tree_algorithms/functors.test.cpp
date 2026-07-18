@@ -16,7 +16,7 @@
 
 using beman::tree_algorithms::fold_fix;
 using beman::tree_algorithms::has_functor_instance;
-using beman::tree_algorithms::make_box;
+using beman::tree_algorithms::make_slot;
 using beman::tree_algorithms::make_succ;
 using beman::tree_algorithms::make_zero;
 using beman::tree_algorithms::Nat;
@@ -41,7 +41,7 @@ constexpr auto fmap_nat(Fn&& fn, const NatF<A>& layer) {
     return std::visit(
         overloaded{
             [](const Zero&) -> NatF<B> { return Zero{}; },
-            [&fn](const Succ<A>& s) -> NatF<B> { return Succ<B>{make_box<B>(std::invoke(fn, *s.pred))}; },
+            [&fn](const Succ<A>& s) -> NatF<B> { return Succ<B>{make_slot<B>(std::invoke(fn, *s.pred))}; },
         },
         layer);
 }
@@ -65,7 +65,7 @@ inline constexpr auto weigh_algebra = [](const NatF<int>& layer) -> int {
 inline constexpr auto countdown_coalgebra = [](int n) -> NatF<int> {
     if (n <= 0)
         return Zero{};
-    return Succ<int>{make_box<int>(n - 1)};
+    return Succ<int>{make_slot<int>(n - 1)};
 };
 
 // ---------------------------------------------------------------------

@@ -61,7 +61,7 @@ static_assert(has_functor_instance<RoseF<int, int>>);
 
 constexpr auto fmap_maps_children_in_order() -> bool {
     RoseF<int, int> layer{7, {1, 2, 3}};
-    auto mapped = functor_typeclass<RoseF<int, int>>.fmap([](const int& x) { return x * 2; }, layer);
+    auto            mapped = functor_typeclass<RoseF<int, int>>.fmap([](const int& x) { return x * 2; }, layer);
     return mapped.value == 7 && mapped.children == std::vector<int>{2, 4, 6};
 }
 
@@ -169,7 +169,8 @@ TEST_CASE("RoseTree - InOrderIsBinaryNotGeneric", "[tree_algorithms::rose_tree]"
     // The same three values, 2 above 1 and 3, in both representations.
     using BinTree = BinaryTreeFix<int>;
     auto bin_leaf = [](int v) -> BinTree {
-        return wrap_fix<BinaryTreeLayer<int>::template F>(BinaryTreeF<int, BinTree>{v, Box<BinTree>{}, Box<BinTree>{}});
+        return wrap_fix<BinaryTreeLayer<int>::template F>(
+            BinaryTreeF<int, BinTree>{v, Box<BinTree>{}, Box<BinTree>{}});
     };
     auto bin = wrap_fix<BinaryTreeLayer<int>::template F>(
         BinaryTreeF<int, BinTree>{2, make_box<BinTree>(bin_leaf(1)), make_box<BinTree>(bin_leaf(3))});

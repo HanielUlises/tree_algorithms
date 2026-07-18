@@ -40,7 +40,7 @@ int main() {
     // absent child. Swapping child order or dropping a level changes the
     // string, so the printed shape pins the traversal exactly.
     auto shape_algebra = [](const BinaryTreeF<int, std::string>& layer) -> std::string {
-        auto child = [](const Box<std::string>& c) { return c.ptr ? *c : std::string("."); };
+        auto child = [](const auto& c) { return c ? *c : std::string("."); };
         return "(" + child(layer.left) + " " + std::to_string(layer.value) + " " + child(layer.right) + ")";
     };
 

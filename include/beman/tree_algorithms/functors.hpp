@@ -12,6 +12,7 @@ import beman.tree_algorithms;
 #else
 
     #include <beman/tree_algorithms/box.hpp>
+    #include <beman/tree_algorithms/child_slot.hpp>
     #include <beman/tree_algorithms/fix.hpp>
     #include <beman/tree_algorithms/functor.hpp>
     #include <beman/tree_algorithms/overloaded.hpp>
@@ -42,10 +43,11 @@ namespace beman::tree_algorithms {
 /** Zero alternative: no recursive positions. */
 struct Zero {};
 
-/** Successor alternative: holds the boxed predecessor. */
+/** Successor alternative: holds the predecessor in a child slot — boxed
+ * at the knot, inline at complete types. */
 template <typename A>
 struct Succ {
-    Box<A> pred;
+    child_slot_t<A> pred;
 };
 
 /** Non-recursive naturals base functor. Nat = Fix<NatF> ties the knot. */
@@ -71,7 +73,7 @@ struct NatFFunctorImpl {
         return std::visit(
             overloaded{
                 [](const Zero&) -> NatF<B> { return Zero{}; },
-                [&fn](const Succ<A>& s) -> NatF<B> { return Succ<B>{make_box<B>(std::invoke(fn, *s.pred))}; },
+                [&fn](const Succ<A>& s) -> NatF<B> { return Succ<B>{make_slot<B>(std::invoke(fn, *s.pred))}; },
             },
             layer);
     }
@@ -98,16 +100,18 @@ inline constexpr auto functor_typeclass<NatF<A> > = NatFFunctorMap<A>{};
 constexpr auto make_zero() -> Nat { return wrap_fix<NatF>(NatF<Nat>{Zero{}}); }
 
 /** Wrap @p n as the predecessor of a new Succ node. */
-constexpr auto make_succ(Nat n) -> Nat { return wrap_fix<NatF>(NatF<Nat>{Succ<Nat>{make_box<Nat>(std::move(n))}}); }
+constexpr auto make_succ(Nat n) -> Nat { return wrap_fix<NatF>(NatF<Nat>{Succ<Nat>{make_slot<Nat>(std::move(n))}}); }
 
-/** Unfold: build a Nat counting down from @p n. */
+/** Unfold: build a Nat counting down from @p n. The seed layer's
+ * predecessor is a complete int, so its slot is inline — the coalgebra
+ * allocates nothing. */
 constexpr auto nat_from_int(int n) -> Nat {
     return unfold_fix<NatF>(
         [](int m) -> NatF<int> {
             if (m <= 0) {
                 return Zero{};
             }
-            return Succ<int>{make_box<int>(m - 1)};
+            return Succ<int>{make_slot<int>(m - 1)};
         },
         n);
 }

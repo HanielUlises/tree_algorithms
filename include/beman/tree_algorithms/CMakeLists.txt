@@ -9,6 +9,7 @@ if(BEMAN_TREE_ALGORITHMS_USE_MODULES)
                 FILES
                     binary_tree.hpp
                     box.hpp
+                    child_slot.hpp
                     config.hpp
                     expression.hpp
                     fix.hpp
@@ -33,6 +34,7 @@ else()
                 FILES
                     binary_tree.hpp
                     box.hpp
+                    child_slot.hpp
                     config.hpp
                     expression.hpp
                     fix.hpp

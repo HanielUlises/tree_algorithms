@@ -79,9 +79,8 @@ using RoseTreeFix = Fix<RoseLayer<T>::template F>;
 
 /** Assemble a rose tree node from a value and its subtrees. */
 template <typename T>
-constexpr auto rose(T value, std::vector<RoseTreeFix<T>> children = {}) -> RoseTreeFix<T> {
-    return wrap_fix<RoseLayer<T>::template F>(
-        RoseF<T, RoseTreeFix<T>>{std::move(value), std::move(children)});
+constexpr auto rose(T value, std::vector<RoseTreeFix<T> > children = {}) -> RoseTreeFix<T> {
+    return wrap_fix<RoseLayer<T>::template F>(RoseF<T, RoseTreeFix<T> >{std::move(value), std::move(children)});
 }
 // 8f0e2d0a-5c1f-4be4-9f1e-3b7a8c92d461 end
 
@@ -96,7 +95,7 @@ template <typename T, typename A>
 struct RoseFFunctorImpl {
     template <typename Fn>
     constexpr auto fmap(this auto&&, Fn&& fn, const RoseF<T, A>& layer) {
-        using B = std::remove_cvref_t<std::invoke_result_t<Fn, const A&>>;
+        using B = std::remove_cvref_t<std::invoke_result_t<Fn, const A&> >;
         std::vector<B> children;
         children.reserve(layer.children.size());
         for (const A& child : layer.children) {
@@ -109,13 +108,13 @@ struct RoseFFunctorImpl {
 /** Functor map for RoseF<T, A>: the fmap primitive plus the derived
  * operations from the Functor CRTP base. */
 template <typename T, typename A>
-struct RoseFFunctorMap : Functor<RoseFFunctorImpl<T, A>> {
+struct RoseFFunctorMap : Functor<RoseFFunctorImpl<T, A> > {
     using RoseFFunctorImpl<T, A>::fmap;
 };
 
 /** Registers RoseFFunctorMap as the Functor instance for RoseF<T, A>. */
 template <typename T, typename A>
-inline constexpr auto functor_typeclass<RoseF<T, A>> = RoseFFunctorMap<T, A>{};
+inline constexpr auto functor_typeclass<RoseF<T, A> > = RoseFFunctorMap<T, A>{};
 // 0d3c6e8b-92f4-45f7-8a26-6c1de5b0a973 end
 
 // ---------------------------------------------------------------------
@@ -134,10 +133,10 @@ inline constexpr auto functor_typeclass<RoseF<T, A>> = RoseFFunctorMap<T, A>{};
  */
 struct RoseLayerFoldMap {
     template <typename MapFn, typename Combine, typename Result, typename T>
-    constexpr auto operator()(const MapFn& map_fn,
-                              const Combine& combine,
+    constexpr auto operator()(const MapFn&                   map_fn,
+                              const Combine&                 combine,
                               [[maybe_unused]] const Result& identity,
-                              const RoseF<T, Result>& layer) const -> Result {
+                              const RoseF<T, Result>&        layer) const -> Result {
         Result acc = map_fn(layer.value);
         for (const Result& child : layer.children) {
             acc = combine(acc, child);
@@ -152,7 +151,7 @@ inline constexpr RoseLayerFoldMap rose_layer_fold_map{};
  * no project_typeclass registration — the rose tree is Fix-native, and
  * the Fix overloads of the verbs already know how to unwrap it. */
 template <typename T, typename A>
-inline constexpr auto layer_fold_typeclass<RoseF<T, A>> = rose_layer_fold_map;
+inline constexpr auto layer_fold_typeclass<RoseF<T, A> > = rose_layer_fold_map;
 // 4b9d17f2-30a5-4e1c-b8d4-7f52a6c3e08d end
 
 } // namespace beman::tree_algorithms

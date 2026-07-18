@@ -25,7 +25,7 @@ using beman::tree_algorithms::Expr;
 using beman::tree_algorithms::ExprF;
 using beman::tree_algorithms::fold_fix;
 using beman::tree_algorithms::has_functor_instance;
-using beman::tree_algorithms::make_box;
+using beman::tree_algorithms::make_slot;
 using beman::tree_algorithms::Mul;
 using beman::tree_algorithms::mul_node;
 using beman::tree_algorithms::overloaded;
@@ -48,10 +48,10 @@ constexpr auto fmap_expr(Fn&& fn, const ExprF<A>& layer) {
         overloaded{
             [](const Const<A>& c) -> ExprF<B> { return Const<B>{c.val}; },
             [&fn](const Add<A>& a) -> ExprF<B> {
-                return Add<B>{make_box<B>(std::invoke(fn, *a.left)), make_box<B>(std::invoke(fn, *a.right))};
+                return Add<B>{make_slot<B>(std::invoke(fn, *a.left)), make_slot<B>(std::invoke(fn, *a.right))};
             },
             [&fn](const Mul<A>& m) -> ExprF<B> {
-                return Mul<B>{make_box<B>(std::invoke(fn, *m.left)), make_box<B>(std::invoke(fn, *m.right))};
+                return Mul<B>{make_slot<B>(std::invoke(fn, *m.left)), make_slot<B>(std::invoke(fn, *m.right))};
             },
         },
         layer);
@@ -94,7 +94,7 @@ inline constexpr auto split_coalgebra = [](const Range& r) -> ExprF<Range> {
     if (hi - lo <= 1)
         return Const<Range>{lo};
     int mid = lo + (hi - lo) / 2;
-    return Add<Range>{make_box<Range>(Range{lo, mid}), make_box<Range>(Range{mid, hi})};
+    return Add<Range>{make_slot<Range>(Range{lo, mid}), make_slot<Range>(Range{mid, hi})};
 };
 
 // ---------------------------------------------------------------------

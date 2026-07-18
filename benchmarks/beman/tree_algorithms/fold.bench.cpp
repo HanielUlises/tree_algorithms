@@ -40,9 +40,19 @@
 //                  toolchain provides it (__cpp_lib_indirect), e.g. g++-16
 //                  at -std=gnu++26.
 
+// The library's layers hold children in child_slot storage: Box exactly
+// at the knot, inline std::optional at complete types, so the F<Result>
+// layers a fold materializes allocate nothing. The (explicit inline
+// control) rows run the same verbs with a hand-written fmap over
+// InlineLayer (inline_layer.hpp) — the experiment that motivated the
+// child_slot adoption, kept as a parity check: the registered path
+// should match it, and both should sit on "hand recursion (Fix<Box>
+// tree)", the floor for this tree layout.
+
 #include <beman/tree_algorithms/binary_tree.hpp>
 
 #include "fix_unique_tree.hpp"
+#include "inline_layer.hpp"
 #include "naive_trees.hpp"
 
 #include <catch2/benchmark/catch_benchmark.hpp>
@@ -50,6 +60,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <type_traits>
 #include <utility>
 
 using beman::tree_algorithms::BinaryTree;
@@ -57,7 +69,9 @@ using beman::tree_algorithms::BinaryTreeF;
 using beman::tree_algorithms::BinaryTreeFix;
 using beman::tree_algorithms::fold_fix;
 using beman::tree_algorithms::fold_map;
+using beman::tree_algorithms::fold_with;
 using beman::tree_algorithms::to_fix;
+using beman::tree_algorithms::unwrap_fix;
 
 namespace {
 
@@ -136,15 +150,81 @@ auto sum_fix_map(const BinaryTreeFix<std::int64_t>& tree) -> std::int64_t {
 auto sum_fix_algebra(const BinaryTreeFix<std::int64_t>& tree) -> std::int64_t {
     auto algebra = [](const BinaryTreeF<std::int64_t, std::int64_t>& layer) -> std::int64_t {
         std::int64_t total = layer.value;
-        if (layer.left.ptr) {
+        if (layer.left) {
             total += *layer.left;
         }
-        if (layer.right.ptr) {
+        if (layer.right) {
             total += *layer.right;
         }
         return total;
     };
     return fold_fix<std::int64_t>(algebra, tree);
+}
+
+// The floor: hand recursion over the Fix<Box> tree itself. Same node
+// layout as every fold_fix row (value + two owning pointers); no verb, no
+// materialized layer. Any gap between this and a fold_fix row is verb
+// overhead, not tree layout.
+auto sum_fix_hand(const BinaryTreeFix<std::int64_t>& tree) -> std::int64_t {
+    const auto&  layer = unwrap_fix(tree);
+    std::int64_t total = layer.value;
+    if (layer.left.ptr) {
+        total += sum_fix_hand(*layer.left);
+    }
+    if (layer.right.ptr) {
+        total += sum_fix_hand(*layer.right);
+    }
+    return total;
+}
+
+// The explicit inline-result fmap for BinaryTreeF layers: the experiment
+// that motivated child_slot, kept as a parity control for the registered
+// fmap (InlineLayer ≅ BinaryTreeF at a complete type; both allocate
+// nothing).
+struct BoxedToInlineFMap {
+    template <typename Fn>
+    auto operator()(Fn&& fn, const BinaryTreeF<std::int64_t, BinaryTreeFix<std::int64_t> >& layer) const {
+        using B = std::remove_cvref_t<std::invoke_result_t<Fn&, const BinaryTreeFix<std::int64_t>&> >;
+        return bench::InlineLayer<std::int64_t, B>{
+            layer.value,
+            layer.left ? std::optional<B>(fn(*layer.left)) : std::optional<B>{},
+            layer.right ? std::optional<B>(fn(*layer.right)) : std::optional<B>{},
+        };
+    }
+};
+
+constexpr auto inline_sum_algebra = [](const bench::InlineLayer<std::int64_t, std::int64_t>& layer) -> std::int64_t {
+    std::int64_t total = layer.value;
+    if (layer.left) {
+        total += *layer.left;
+    }
+    if (layer.right) {
+        total += *layer.right;
+    }
+    return total;
+};
+
+// Same tree, same fold_fix verb (the explicit-fmap overload), only the
+// materialized layer's storage differs: inline instead of boxed.
+auto sum_fix_inline(const BinaryTreeFix<std::int64_t>& tree) -> std::int64_t {
+    return fold_fix<std::int64_t>(inline_sum_algebra, BoxedToInlineFMap{}, tree);
+}
+
+// The direct verb with inline layers end to end: the projection exposes a
+// layer of the shared_ptr tree with inline pointer handles, and the fmap
+// materializes inline result layers. No allocation anywhere in the fold —
+// against sum_direct (registered projection, boxed handles AND boxed
+// results), this isolates what the direct verb's boxing costs.
+auto sum_direct_inline(const BinaryTree<std::int64_t>& tree) -> std::int64_t {
+    using P      = const BinaryTree<std::int64_t>*;
+    auto project = [](P node) {
+        return bench::InlineLayer<std::int64_t, P>{
+            node->value(),
+            node->has_left() ? std::optional<P>(&node->left()) : std::optional<P>{},
+            node->has_right() ? std::optional<P>(&node->right()) : std::optional<P>{},
+        };
+    };
+    return fold_with<std::int64_t>(inline_sum_algebra, bench::inline_layer_fmap, project, &tree);
 }
 
 // A Fix tree over the unique_ptr-storage functor: same Fix, same fold_fix,
@@ -194,8 +274,8 @@ TEST_CASE("fold: sum a very large tree", "[fold][!benchmark]") {
 
     // The naive representations, each built to the same shape (the per-node
     // numbering differs but the total does not).
-    std::int64_t un      = 1;
-    auto         unique_ = build_unique(kFoldDepth, un);
+    std::int64_t un         = 1;
+    auto         unique_    = build_unique(kFoldDepth, un);
     std::int64_t uf         = 1;
     auto         unique_fix = build_unique_fix(kFoldDepth, uf);
 #ifdef __cpp_lib_indirect
@@ -208,8 +288,11 @@ TEST_CASE("fold: sum a very large tree", "[fold][!benchmark]") {
     REQUIRE(bench::sum(*unique_) == expected);
     REQUIRE(sum_unique_fix(unique_fix) == expected);
     REQUIRE(sum_direct(native) == expected);
+    REQUIRE(sum_direct_inline(native) == expected);
     REQUIRE(sum_fix_map(fixed) == expected);
     REQUIRE(sum_fix_algebra(fixed) == expected);
+    REQUIRE(sum_fix_inline(fixed) == expected);
+    REQUIRE(sum_fix_hand(fixed) == expected);
 #ifdef __cpp_lib_indirect
     REQUIRE(bench::sum(indirect) == expected);
 #endif
@@ -219,8 +302,11 @@ TEST_CASE("fold: sum a very large tree", "[fold][!benchmark]") {
 #ifdef __cpp_lib_indirect
     BENCHMARK("hand recursion (std::indirect)") { return bench::sum(indirect); };
 #endif
+    BENCHMARK("hand recursion (Fix<Box> tree)") { return sum_fix_hand(fixed); };
     BENCHMARK("fold_map / native (direct verb)") { return sum_direct(native); };
+    BENCHMARK("fold_with / native (explicit inline control)") { return sum_direct_inline(native); };
     BENCHMARK("fold_fix / Fix<Box>") { return sum_fix_algebra(fixed); };
+    BENCHMARK("fold_fix / Fix<Box> (explicit inline control)") { return sum_fix_inline(fixed); };
     BENCHMARK("fold_map / Fix<Box>") { return sum_fix_map(fixed); };
     BENCHMARK("fold_fix / Fix<unique_ptr>") { return sum_unique_fix(unique_fix); };
 }

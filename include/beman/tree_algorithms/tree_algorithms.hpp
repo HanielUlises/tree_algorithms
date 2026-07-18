@@ -13,6 +13,7 @@ import beman.tree_algorithms;
 
     #include <beman/tree_algorithms/binary_tree.hpp>
     #include <beman/tree_algorithms/box.hpp>
+    #include <beman/tree_algorithms/child_slot.hpp>
     #include <beman/tree_algorithms/expression.hpp>
     #include <beman/tree_algorithms/fix.hpp>
     #include <beman/tree_algorithms/fold_map.hpp>

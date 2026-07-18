@@ -17,24 +17,26 @@
 #include <utility>
 #include <variant>
 
+using beman::tree_algorithms::add_node;
 using beman::tree_algorithms::binary_tree_layer_fold_map;
 using beman::tree_algorithms::BinaryTree;
 using beman::tree_algorithms::BinaryTreeF;
 using beman::tree_algorithms::BinaryTreeFix;
 using beman::tree_algorithms::BinaryTreeLayer;
 using beman::tree_algorithms::Box;
+using beman::tree_algorithms::child_slot_t;
+using beman::tree_algorithms::const_node;
+using beman::tree_algorithms::eval_algebra;
 using beman::tree_algorithms::Fix;
 using beman::tree_algorithms::fold_fix;
 using beman::tree_algorithms::fold_map;
-using beman::tree_algorithms::make_box;
-using beman::tree_algorithms::overloaded;
-using beman::tree_algorithms::add_node;
-using beman::tree_algorithms::const_node;
-using beman::tree_algorithms::eval_algebra;
 using beman::tree_algorithms::FringeTree;
 using beman::tree_algorithms::has_layer_fold_instance;
 using beman::tree_algorithms::has_project_instance;
+using beman::tree_algorithms::make_box;
+using beman::tree_algorithms::make_slot;
 using beman::tree_algorithms::mul_node;
+using beman::tree_algorithms::overloaded;
 using beman::tree_algorithms::to_fix;
 using beman::tree_algorithms::wrap_fix;
 
@@ -108,14 +110,13 @@ inline constexpr ListLayerFoldMap list_layer_fold_map{};
 // not constexpr in C++23, so the map builds one-char strings directly.
 // ---------------------------------------------------------------------
 
-inline constexpr auto show_digit = [](int x) { return std::string(1, static_cast<char>('0' + x)); };
-inline constexpr auto concat     = [](const std::string& a, const std::string& b) { return a + b; };
+inline constexpr auto show_digit   = [](int x) { return std::string(1, static_cast<char>('0' + x)); };
+inline constexpr auto concat       = [](const std::string& a, const std::string& b) { return a + b; };
 inline constexpr auto identity_map = [](int x) { return x; };
 
 constexpr auto list_concat_in_order() -> bool {
     auto list = make_cons(1, make_cons(2, make_cons(3, make_nil())));
-    return fold_map<std::string>(show_digit, concat, std::string{}, list_layer_fold_map, fmap_list_fn, list) ==
-           "123";
+    return fold_map<std::string>(show_digit, concat, std::string{}, list_layer_fold_map, fmap_list_fn, list) == "123";
 }
 
 static_assert(list_concat_in_order());
@@ -157,8 +158,8 @@ constexpr auto fmap_btree(Fn&& fn, const BinaryTreeF<int, A>& layer) {
     using B = std::remove_cvref_t<std::invoke_result_t<Fn, const A&>>;
     return BinaryTreeF<int, B>{
         layer.value,
-        layer.left.ptr ? make_box<B>(std::invoke(fn, *layer.left)) : Box<B>{},
-        layer.right.ptr ? make_box<B>(std::invoke(fn, *layer.right)) : Box<B>{},
+        layer.left ? make_slot<B>(std::invoke(fn, *layer.left)) : child_slot_t<B>{},
+        layer.right ? make_slot<B>(std::invoke(fn, *layer.right)) : child_slot_t<B>{},
     };
 }
 
@@ -168,8 +169,8 @@ inline constexpr auto fmap_btree_fn = [](auto&& fn, const auto& layer) {
 
 constexpr auto tree_concat_in_order() -> bool {
     auto tree = fixed_node(1, fixed_leaf(2), fixed_leaf(3));
-    return fold_map<std::string>(
-               show_digit, concat, std::string{}, binary_tree_layer_fold_map, fmap_btree_fn, tree) == "213";
+    return fold_map<std::string>(show_digit, concat, std::string{}, binary_tree_layer_fold_map, fmap_btree_fn, tree) ==
+           "213";
 }
 
 constexpr auto tree_concat_mirrored() -> bool {
@@ -211,11 +212,10 @@ static_assert(expr_constants_vs_eval());
 
 // Lookup overload agrees with the explicit form, at compile time.
 constexpr auto lookup_matches_explicit() -> bool {
-    auto tree = fixed_node(1, fixed_leaf(2), fixed_leaf(3));
-    auto via_lookup =
-        fold_map<std::string>(show_digit, concat, std::string{}, tree);
-    auto via_explicit = fold_map<std::string>(
-        show_digit, concat, std::string{}, binary_tree_layer_fold_map, fmap_btree_fn, tree);
+    auto tree       = fixed_node(1, fixed_leaf(2), fixed_leaf(3));
+    auto via_lookup = fold_map<std::string>(show_digit, concat, std::string{}, tree);
+    auto via_explicit =
+        fold_map<std::string>(show_digit, concat, std::string{}, binary_tree_layer_fold_map, fmap_btree_fn, tree);
     return via_lookup == via_explicit && via_lookup == "213";
 }
 
@@ -293,8 +293,8 @@ TEST_CASE("FoldMap - DirectPathAgreesWithAdapterPath", "[tree_algorithms::fold_m
     using Ptr     = const IntTree*;
     auto project  = [](Ptr t) -> BinaryTreeF<int, Ptr> {
         return BinaryTreeF<int, Ptr>{t->value(),
-                                     t->has_left() ? make_box<Ptr>(&t->left()) : Box<Ptr>{},
-                                     t->has_right() ? make_box<Ptr>(&t->right()) : Box<Ptr>{}};
+                                     t->has_left() ? make_slot<Ptr>(&t->left()) : child_slot_t<Ptr>{},
+                                     t->has_right() ? make_slot<Ptr>(&t->right()) : child_slot_t<Ptr>{}};
     };
 
     auto t      = IntTree::node(1, IntTree::node(2, IntTree::leaf(4), IntTree::leaf(5)), IntTree::leaf(3));

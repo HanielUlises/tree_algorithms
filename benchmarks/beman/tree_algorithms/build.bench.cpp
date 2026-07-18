@@ -29,9 +29,17 @@
 //            This is the answer to "isn't the intermediate tree wasteful" —
 //            when you do not need the tree, you do not build it.
 
+// The library's child_slot storage makes every F<Seed> layer a coalgebra
+// produces inline (seeds are complete types), so unfold_fix allocates
+// only the product tree's own nodes and refold allocates nothing at all.
+// The (explicit inline control) rows re-derive the same behavior with a
+// hand-written InlineLayer fmap (inline_layer.hpp) — the experiment that
+// motivated child_slot, kept as a parity check on the registered path.
+
 #include <beman/tree_algorithms/binary_tree.hpp>
 
 #include "fix_unique_tree.hpp"
+#include "inline_layer.hpp"
 #include "naive_trees.hpp"
 
 #include <catch2/benchmark/catch_benchmark.hpp>
@@ -40,6 +48,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <type_traits>
 #include <utility>
 
@@ -48,8 +57,10 @@ using beman::tree_algorithms::BinaryTreeF;
 using beman::tree_algorithms::BinaryTreeFix;
 using beman::tree_algorithms::BinaryTreeLayer;
 using beman::tree_algorithms::Box;
+using beman::tree_algorithms::child_slot_t;
 using beman::tree_algorithms::fold_fix;
 using beman::tree_algorithms::make_box;
+using beman::tree_algorithms::make_slot;
 using beman::tree_algorithms::refold;
 using beman::tree_algorithms::unfold_fix;
 
@@ -66,22 +77,23 @@ using Range = std::pair<std::size_t, std::size_t>;
 
 // Coalgebra: split [lo, hi) at its midpoint into a value and two child
 // ranges. The value is the midpoint index, so a whole tree sums to
-// 0 + 1 + ... + (N-1) and the answer is checkable.
+// 0 + 1 + ... + (N-1) and the answer is checkable. Range is complete, so
+// the seed layer's child slots are inline — no allocation here.
 constexpr auto coalgebra = [](const Range& r) -> BinaryTreeF<std::int64_t, Range> {
     auto [lo, hi]   = r;
     std::size_t mid = lo + (hi - lo) / 2;
-    return BinaryTreeF<std::int64_t, Range>{
-        static_cast<std::int64_t>(mid),
-        mid > lo ? make_box<Range>(Range{lo, mid}) : Box<Range>{},
-        hi > mid + 1 ? make_box<Range>(Range{mid + 1, hi}) : Box<Range>{}};
+    return BinaryTreeF<std::int64_t, Range>{static_cast<std::int64_t>(mid),
+                                            mid > lo ? make_slot<Range>(Range{lo, mid}) : child_slot_t<Range>{},
+                                            hi > mid + 1 ? make_slot<Range>(Range{mid + 1, hi})
+                                                         : child_slot_t<Range>{}};
 };
 
 constexpr auto sum_layer = [](const BinaryTreeF<std::int64_t, std::int64_t>& layer) -> std::int64_t {
     std::int64_t total = layer.value;
-    if (layer.left.ptr) {
+    if (layer.left) {
         total += *layer.left;
     }
-    if (layer.right.ptr) {
+    if (layer.right) {
         total += *layer.right;
     }
     return total;
@@ -90,8 +102,8 @@ constexpr auto sum_layer = [](const BinaryTreeF<std::int64_t, std::int64_t>& lay
 // The hand-written equivalent of unfold_fix over the same range split:
 // the builder the verb is meant to replace.
 auto build_hand(const Range& r) -> Fixed {
-    auto [lo, hi]   = r;
-    std::size_t mid = lo + (hi - lo) / 2;
+    auto [lo, hi]                        = r;
+    std::size_t                      mid = lo + (hi - lo) / 2;
     BinaryTreeF<std::int64_t, Fixed> layer{static_cast<std::int64_t>(mid), Box<Fixed>{}, Box<Fixed>{}};
     if (mid > lo) {
         layer.left = make_box<Fixed>(build_hand(Range{lo, mid}));
@@ -104,13 +116,64 @@ auto build_hand(const Range& r) -> Fixed {
 
 auto build_unfold(const Range& r) -> Fixed { return unfold_fix<Layer::template F>(coalgebra, r); }
 
-auto refold_sum(const Range& r) -> std::int64_t { return refold<std::int64_t, Layer::template F>(sum_layer, coalgebra, r); }
+auto refold_sum(const Range& r) -> std::int64_t {
+    return refold<std::int64_t, Layer::template F>(sum_layer, coalgebra, r);
+}
+
+// The same coalgebra with the seed layer's children inline: no boxes just
+// to hand two Ranges to the next recursion step.
+constexpr auto coalgebra_inline = [](const Range& r) -> bench::InlineLayer<std::int64_t, Range> {
+    auto [lo, hi]   = r;
+    std::size_t mid = lo + (hi - lo) / 2;
+    return bench::InlineLayer<std::int64_t, Range>{
+        static_cast<std::int64_t>(mid),
+        mid > lo ? std::optional<Range>(Range{lo, mid}) : std::optional<Range>{},
+        hi > mid + 1 ? std::optional<Range>(Range{mid + 1, hi}) : std::optional<Range>{}};
+};
+
+// fmap from an inline seed layer into the boxed tree layer: only the real
+// tree children are boxed — the allocation that IS the product.
+struct InlineToBoxedFMap {
+    template <typename Fn>
+    auto operator()(Fn&& fn, const bench::InlineLayer<std::int64_t, Range>& layer) const {
+        return BinaryTreeF<std::int64_t, Fixed>{
+            layer.value,
+            layer.left ? make_box<Fixed>(fn(*layer.left)) : Box<Fixed>{},
+            layer.right ? make_box<Fixed>(fn(*layer.right)) : Box<Fixed>{},
+        };
+    }
+};
+
+auto build_unfold_inline(const Range& r) -> Fixed {
+    return unfold_fix<Layer::template F>(coalgebra_inline, InlineToBoxedFMap{}, r);
+}
+
+constexpr auto inline_sum_layer = [](const bench::InlineLayer<std::int64_t, std::int64_t>& layer) -> std::int64_t {
+    std::int64_t total = layer.value;
+    if (layer.left) {
+        total += *layer.left;
+    }
+    if (layer.right) {
+        total += *layer.right;
+    }
+    return total;
+};
+
+// refold with inline layers everywhere: coalgebra emits an inline seed
+// layer, fmap materializes an inline result layer, the algebra consumes
+// it. Zero heap traffic in the whole computation.
+template <typename A>
+using InlineRangeLayer = bench::InlineLayer<std::int64_t, A>;
+
+auto refold_sum_inline(const Range& r) -> std::int64_t {
+    return refold<std::int64_t, InlineRangeLayer>(inline_sum_layer, coalgebra_inline, bench::inline_layer_fmap, r);
+}
 
 // Hand-written builders for the naive representations over the same range
 // split (types and sum() in naive_trees.hpp).
 auto build_unique(const Range& r) -> std::unique_ptr<bench::UniqueTree> {
-    auto [lo, hi]   = r;
-    std::size_t mid = lo + (hi - lo) / 2;
+    auto [lo, hi]    = r;
+    std::size_t mid  = lo + (hi - lo) / 2;
     auto        node = std::make_unique<bench::UniqueTree>();
     node->value      = static_cast<std::int64_t>(mid);
     if (mid > lo) {
@@ -124,8 +187,8 @@ auto build_unique(const Range& r) -> std::unique_ptr<bench::UniqueTree> {
 
 #ifdef __cpp_lib_indirect
 auto build_indirect(const Range& r) -> bench::IndirectTree {
-    auto [lo, hi]   = r;
-    std::size_t mid = lo + (hi - lo) / 2;
+    auto [lo, hi]           = r;
+    std::size_t         mid = lo + (hi - lo) / 2;
     bench::IndirectTree node;
     node.value = static_cast<std::int64_t>(mid);
     if (mid > lo) {
@@ -143,8 +206,8 @@ auto build_indirect(const Range& r) -> bench::IndirectTree {
 using UFix = bench::UniquePtrTreeFix<std::int64_t>;
 
 auto build_unique_fix(const Range& r) -> UFix {
-    auto [lo, hi]   = r;
-    std::size_t mid = lo + (hi - lo) / 2;
+    auto [lo, hi]                                 = r;
+    std::size_t                               mid = lo + (hi - lo) / 2;
     bench::UniquePtrTreeF<std::int64_t, UFix> layer;
     layer.value = static_cast<std::int64_t>(mid);
     if (mid > lo) {
@@ -182,6 +245,7 @@ TEST_CASE("build: grow a large tree", "[build][!benchmark]") {
         static_cast<std::int64_t>(kBuildNodes) * (static_cast<std::int64_t>(kBuildNodes) - 1) / 2;
     REQUIRE(fold_fix<std::int64_t>(sum_layer, build_hand(whole)) == expected);
     REQUIRE(fold_fix<std::int64_t>(sum_layer, build_unfold(whole)) == expected);
+    REQUIRE(fold_fix<std::int64_t>(sum_layer, build_unfold_inline(whole)) == expected);
     REQUIRE(sum_unique_fix(build_unique_fix(whole)) == expected);
     REQUIRE(bench::sum(*build_unique(whole)) == expected);
 #ifdef __cpp_lib_indirect
@@ -190,6 +254,7 @@ TEST_CASE("build: grow a large tree", "[build][!benchmark]") {
 
     BENCHMARK("hand recursive build (Fix<Box>)") { return build_hand(whole); };
     BENCHMARK("unfold_fix build (Fix<Box>)") { return build_unfold(whole); };
+    BENCHMARK("unfold_fix build (explicit inline control)") { return build_unfold_inline(whole); };
     BENCHMARK("hand recursive build (Fix<unique_ptr>)") { return build_unique_fix(whole); };
     BENCHMARK("hand recursive build (unique_ptr)") { return build_unique(whole); };
 #ifdef __cpp_lib_indirect
@@ -198,8 +263,8 @@ TEST_CASE("build: grow a large tree", "[build][!benchmark]") {
 }
 
 TEST_CASE("copy: value semantics vs structural sharing", "[build][copy][!benchmark]") {
-    std::int64_t next   = 0;
-    auto         make   = [&](auto&& self, int depth) -> BinaryTree<std::int64_t> {
+    std::int64_t next = 0;
+    auto         make = [&](auto&& self, int depth) -> BinaryTree<std::int64_t> {
         std::int64_t value = next++;
         if (depth <= 1) {
             return BinaryTree<std::int64_t>::leaf(value);
@@ -208,7 +273,7 @@ TEST_CASE("copy: value semantics vs structural sharing", "[build][copy][!benchma
         auto right = self(self, depth - 1);
         return BinaryTree<std::int64_t>::node(value, std::move(left), std::move(right));
     };
-    auto native = make(make, 16);          // 2^16 - 1 nodes
+    auto native = make(make, 16); // 2^16 - 1 nodes
     auto fixed  = beman::tree_algorithms::to_fix(native);
 
     // Regularity is a storage-policy property, not a Fix property, and it is
@@ -222,8 +287,7 @@ TEST_CASE("copy: value semantics vs structural sharing", "[build][copy][!benchma
                   "unique_ptr tree is move-only — no copy benchmark, and that is the point");
     static_assert(!std::is_copy_constructible_v<UFix>,
                   "Fix over the unique_ptr functor is move-only too — storage, not Fix, decides regularity");
-    static_assert(std::is_copy_constructible_v<Fixed>,
-                  "Fix over the Box functor is regular (copyable)");
+    static_assert(std::is_copy_constructible_v<Fixed>, "Fix over the Box functor is regular (copyable)");
 
     // The honest asymmetry: O(1) refcount bump vs O(N) deep copy. std::indirect
     // deep-copies like Box, for the same value-semantic reason.
@@ -237,15 +301,17 @@ TEST_CASE("copy: value semantics vs structural sharing", "[build][copy][!benchma
 }
 
 TEST_CASE("refold: fuse build into fold", "[build][refold][!benchmark]") {
-    const Range whole{0, kBuildNodes};
+    const Range        whole{0, kBuildNodes};
     const std::int64_t expected =
         static_cast<std::int64_t>(kBuildNodes) * (static_cast<std::int64_t>(kBuildNodes) - 1) / 2;
 
     REQUIRE(refold_sum(whole) == expected);
+    REQUIRE(refold_sum_inline(whole) == expected);
     REQUIRE(fold_fix<std::int64_t>(sum_layer, build_unfold(whole)) == expected);
 
     BENCHMARK("unfold_fix then fold_fix (tree materialized)") {
         return fold_fix<std::int64_t>(sum_layer, build_unfold(whole));
     };
     BENCHMARK("refold (fused, no tree)") { return refold_sum(whole); };
+    BENCHMARK("refold (explicit inline control)") { return refold_sum_inline(whole); };
 }

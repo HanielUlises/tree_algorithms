@@ -10,7 +10,12 @@ set(GCOV_EXECUTABLE "gcov-16" CACHE STRING "GCOV executable" FORCE)
 # C++26-only facilities (e.g. std::indirect) are available. The other
 # compiler-version toolchains stay at the project baseline (gnu++23).
 set(CMAKE_CXX_STANDARD 26)
-string(REPLACE "-std=gnu++23" "-std=gnu++26" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+string(
+    REPLACE "-std=gnu++23"
+    "-std=gnu++26"
+    CMAKE_CXX_FLAGS
+    "${CMAKE_CXX_FLAGS}"
+)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}" CACHE STRING "CXX_FLAGS" FORCE)
 
 set(CMAKE_CXX_FLAGS_ASAN

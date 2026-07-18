@@ -83,8 +83,8 @@ int main() {
     // And the dual: build a balanced BST over [0, 7) directly into
     // unique_ptr nodes — a move-only carrier no copy-based conversion
     // pipeline could produce.
-    using Range          = std::pair<int, int>;
-    auto bst_coalgebra   = [](const Range& r) -> NodeF<Range> {
+    using Range        = std::pair<int, int>;
+    auto bst_coalgebra = [](const Range& r) -> NodeF<Range> {
         auto [lo, hi] = r;
         int mid       = lo + (hi - lo) / 2;
         return {mid,

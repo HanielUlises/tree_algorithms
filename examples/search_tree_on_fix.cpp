@@ -42,9 +42,11 @@ using beman::tree_algorithms::BinaryTreeF;
 using beman::tree_algorithms::BinaryTreeFix;
 using beman::tree_algorithms::BinaryTreeLayer;
 using beman::tree_algorithms::Box;
+using beman::tree_algorithms::child_slot_t;
 using beman::tree_algorithms::fold_fix;
 using beman::tree_algorithms::fold_map;
 using beman::tree_algorithms::make_box;
+using beman::tree_algorithms::make_slot;
 using beman::tree_algorithms::unfold_fix;
 using beman::tree_algorithms::unwrap_fix;
 using beman::tree_algorithms::wrap_fix;
@@ -53,19 +55,18 @@ using beman::tree_algorithms::wrap_fix;
 using SearchTree = BinaryTreeFix<int>;
 // A possibly-empty (sub)tree; disengaged Box = empty. The same type a
 // BinaryTreeF child slot holds.
-using SubTree = Box<SearchTree>;
+using SubTree  = Box<SearchTree>;
 using IntLayer = BinaryTreeLayer<int>;
 
 /** Assemble one node from a value and two possibly-empty subtrees. */
 constexpr auto node(int value, SubTree left, SubTree right) -> SearchTree {
-    return wrap_fix<IntLayer::template F>(
-        BinaryTreeF<int, SearchTree>{value, std::move(left), std::move(right)});
+    return wrap_fix<IntLayer::template F>(BinaryTreeF<int, SearchTree>{value, std::move(left), std::move(right)});
 }
 
 /** Insert @p v, returning the new tree; the input is untouched
  * (persistent by deep copy). Duplicates are dropped: set semantics. */
 constexpr auto insert(const SubTree& tree, int v) -> SubTree {
-    if (!tree.ptr) {
+    if (!tree) {
         return make_box<SearchTree>(node(v, SubTree{}, SubTree{}));
     }
     const BinaryTreeF<int, SearchTree>& layer = unwrap_fix(*tree);
@@ -81,7 +82,7 @@ constexpr auto insert(const SubTree& tree, int v) -> SubTree {
 /** Membership. Plain recursion, deliberately not a fold: it follows one
  * path and never looks at the pruned subtrees. */
 constexpr auto contains(const SubTree& tree, int v) -> bool {
-    if (!tree.ptr) {
+    if (!tree) {
         return false;
     }
     const BinaryTreeF<int, SearchTree>& layer = unwrap_fix(*tree);
@@ -97,13 +98,13 @@ constexpr auto contains(const SubTree& tree, int v) -> bool {
 /** Least value; precondition: nonempty. */
 constexpr auto min_value(const SearchTree& tree) -> int {
     const BinaryTreeF<int, SearchTree>& layer = unwrap_fix(tree);
-    return layer.left.ptr ? min_value(*layer.left) : layer.value;
+    return layer.left ? min_value(*layer.left) : layer.value;
 }
 
 /** Erase @p v if present: the textbook three cases, the two-child case
  * replacing the node's value with its in-order successor. */
 constexpr auto erase(const SubTree& tree, int v) -> SubTree {
-    if (!tree.ptr) {
+    if (!tree) {
         return SubTree{};
     }
     const BinaryTreeF<int, SearchTree>& layer = unwrap_fix(*tree);
@@ -113,10 +114,10 @@ constexpr auto erase(const SubTree& tree, int v) -> SubTree {
     if (layer.value < v) {
         return make_box<SearchTree>(node(layer.value, layer.left, erase(layer.right, v)));
     }
-    if (!layer.left.ptr) {
+    if (!layer.left) {
         return layer.right;
     }
-    if (!layer.right.ptr) {
+    if (!layer.right) {
         return layer.left;
     }
     int successor = min_value(*layer.right);
@@ -127,7 +128,7 @@ constexpr auto erase(const SubTree& tree, int v) -> SubTree {
  * supplies the in-order contract; vector concatenation is the
  * (non-commutative) monoid, so a wrong order is a wrong answer. */
 constexpr auto flatten(const SubTree& tree) -> std::vector<int> {
-    if (!tree.ptr) {
+    if (!tree) {
         return {};
     }
     auto single  = [](int v) -> std::vector<int> { return {v}; };
@@ -141,12 +142,12 @@ constexpr auto flatten(const SubTree& tree) -> std::vector<int> {
 
 /** Height via fold_fix: one whole-tree consumption that IS a fold. */
 constexpr auto height(const SubTree& tree) -> int {
-    if (!tree.ptr) {
+    if (!tree) {
         return 0;
     }
     auto algebra = [](const BinaryTreeF<int, int>& layer) -> int {
-        int left  = layer.left.ptr ? *layer.left : 0;
-        int right = layer.right.ptr ? *layer.right : 0;
+        int left  = layer.left ? *layer.left : 0;
+        int right = layer.right ? *layer.right : 0;
         return 1 + std::max(left, right);
     };
     return fold_fix<int>(algebra, *tree);
@@ -155,11 +156,11 @@ constexpr auto height(const SubTree& tree) -> int {
 /** Shape rendering, the adapter chapter's order-sensitive algebra:
  * "(left value right)" with "." for an absent child. */
 constexpr auto shape(const SubTree& tree) -> std::string {
-    if (!tree.ptr) {
+    if (!tree) {
         return ".";
     }
     auto algebra = [](const BinaryTreeF<int, std::string>& layer) -> std::string {
-        auto child = [](const Box<std::string>& c) { return c.ptr ? *c : std::string("."); };
+        auto child = [](const auto& c) { return c ? *c : std::string("."); };
         return "(" + child(layer.left) + " " + std::to_string(layer.value) + " " + child(layer.right) + ")";
     };
     return fold_fix<std::string>(algebra, *tree);
@@ -176,8 +177,8 @@ constexpr auto balanced(const std::vector<int>& sorted) -> SubTree {
         auto [lo, hi]   = r;
         std::size_t mid = lo + (hi - lo) / 2;
         return BinaryTreeF<int, Range>{sorted[mid],
-                                       mid > lo ? make_box<Range>(Range{lo, mid}) : Box<Range>{},
-                                       hi > mid + 1 ? make_box<Range>(Range{mid + 1, hi}) : Box<Range>{}};
+                                       mid > lo ? make_slot<Range>(Range{lo, mid}) : child_slot_t<Range>{},
+                                       hi > mid + 1 ? make_slot<Range>(Range{mid + 1, hi}) : child_slot_t<Range>{}};
     };
     return make_box<SearchTree>(unfold_fix<IntLayer::template F>(coalgebra, Range{0U, sorted.size()}));
 }

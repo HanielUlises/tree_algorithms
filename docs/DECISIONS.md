@@ -153,6 +153,24 @@ removed).
 Decision 8's answer sheet stays as recorded — it is a verbatim
 generation-time record, not a live pointer.
 
+## Amendment 2026-07-18 — storage at the knot: `child_slot` inline layers
+
+Ratified by Steve in the benchmarking review of 2026-07-18, on evidence from the `benchmarks/` suite and an exact allocation-count diagnostic; this amendment narrows the "performance work is a non-goal" clause of Decision 6 and extends Decision 3.
+Everything else stands: value semantics, `Box` deep-copies at the knot, copies accepted.
+
+- **The finding**: indirection in a base functor is required only at the knot — `F<Fix<F>>` holds children of an incomplete type.
+  Every *materialized* layer (`F<Result>` handed to an algebra, `F<Seed>` from a coalgebra, `F<Handle>` from a projection) instantiates `F` at a complete type, where children can live inline.
+  A layer that hardwires `Box` pays one heap allocation per engaged child per node in every such layer; measured on a 2^20-node fold, that allocation was the entire difference between `fold_fix` and hand-written recursion (8.27 ms vs 4.64 ms, and exactly 0 allocations for the inline path vs one per engaged child boxed).
+  With inline layers, `fold_fix` sits on the hand-recursion floor (4.656 ms vs 4.642 ms), `unfold_fix` allocates exactly its product, and `refold` allocates nothing (1.18 ms → 179 µs).
+- **The mechanism**: `child_slot<A>` (`child_slot.hpp`) — `Box<Fix<F>>` exactly at the knot, matched by partial specialization against `Fix`'s declaration; `std::optional<A>` at every complete type; `make_slot<A>(args...)` constructs whichever the position requires.
+  Both storages are nullable, test engaged as bool (`Box` gained `explicit operator bool`), and dereference with `*`, so layer code reads identically either way.
+  `BinaryTreeF`, `ExprF` (`Add`/`Mul`), and `NatF` (`Succ`) hold children in `child_slot_t<A>`; fmap is unchanged in shape — `F<A> -> F<B>`, the same template, functor laws on the nose.
+- **Value-category overloads**: `wrap_fix` gains an rvalue overload (one move for xvalue arguments instead of two) and `unwrap_fix` an rvalue overload returning `F<Fix<F>>&&` for consuming callers; the const-lvalue forms remain.
+- **Decision 6 as amended**: value semantics and the no-sharing/no-memoization stance are unchanged, and candor about costs remains the rule.
+  What changes is the claim that performance work is out of scope: storage choice in materialized layers is *design* — indirection where the math requires it and nowhere else — not tuning, and the paper should state the measured consequence: the verbs are zero-overhead against hand recursion over the same representation.
+- **Decision 3 as amended**: `Box` remains the knot storage, for the recorded reasons (constexpr, nullable, aggregate-friendly).
+  The inline slot is plain `std::optional`; no new vocabulary type is introduced.
+
 ## Discrepancies
 
 Points where a cited source does not line up exactly with the decision as recorded, noted rather than silently adjusted:

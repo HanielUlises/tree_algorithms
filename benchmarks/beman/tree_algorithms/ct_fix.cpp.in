@@ -32,9 +32,9 @@ constexpr std::size_t kNodes = @BENCH_N@;
 using beman::tree_algorithms::BinaryTreeF;
 using beman::tree_algorithms::BinaryTreeFix;
 using beman::tree_algorithms::BinaryTreeLayer;
-using beman::tree_algorithms::Box;
+using beman::tree_algorithms::child_slot_t;
 using beman::tree_algorithms::fold_fix;
-using beman::tree_algorithms::make_box;
+using beman::tree_algorithms::make_slot;
 using beman::tree_algorithms::unfold_fix;
 
 using Layer = BinaryTreeLayer<std::int64_t>;
@@ -48,16 +48,16 @@ constexpr auto build_and_sum() -> std::int64_t {
         std::size_t mid = lo + (hi - lo) / 2;
         return BinaryTreeF<std::int64_t, Range>{
             static_cast<std::int64_t>(mid),
-            mid > lo ? make_box<Range>(Range{lo, mid}) : Box<Range>{},
-            hi > mid + 1 ? make_box<Range>(Range{mid + 1, hi}) : Box<Range>{}};
+            mid > lo ? make_slot<Range>(Range{lo, mid}) : child_slot_t<Range>{},
+            hi > mid + 1 ? make_slot<Range>(Range{mid + 1, hi}) : child_slot_t<Range>{}};
     };
     auto tree    = unfold_fix<Layer::template F>(coalgebra, Range{0, kNodes});
     auto sum_alg = [](const BinaryTreeF<std::int64_t, std::int64_t>& layer) -> std::int64_t {
         std::int64_t total = layer.value;
-        if (layer.left.ptr) {
+        if (layer.left) {
             total += *layer.left;
         }
-        if (layer.right.ptr) {
+        if (layer.right) {
             total += *layer.right;
         }
         return total;

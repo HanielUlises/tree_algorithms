@@ -30,8 +30,8 @@ using NatF = std::variant<Zero, Succ<A>>;
 // Constexpr coverage: Fix construction and wrap/unwrap round-trip evaluate
 // at compile time, including a Box-ed recursive position.
 constexpr auto fix_wrap_unwrap_roundtrip() -> bool {
-    using Nat  = Fix<NatF>;
-    auto zero  = wrap_fix<NatF>(NatF<Nat>{Zero{}});
+    using Nat = Fix<NatF>;
+    auto zero = wrap_fix<NatF>(NatF<Nat>{Zero{}});
     return std::holds_alternative<Zero>(unwrap_fix(zero));
 }
 
@@ -54,8 +54,8 @@ static_assert(fix_succ_roundtrip());
 } // namespace
 
 TEST_CASE("Fix - NatFZero", "[tree_algorithms::fix]") {
-    using Nat = Fix<NatF>;
-    auto zero = wrap_fix<NatF>(NatF<Nat>{Zero{}});
+    using Nat         = Fix<NatF>;
+    auto        zero  = wrap_fix<NatF>(NatF<Nat>{Zero{}});
     const auto& layer = unwrap_fix(zero);
     CHECK(std::holds_alternative<Zero>(layer));
 }
@@ -78,8 +78,8 @@ TEST_CASE("Fix - NatFSucc", "[tree_algorithms::fix]") {
 
 TEST_CASE("Fix - WrapUnwrapRoundTrip", "[tree_algorithms::fix]") {
     using Nat = Fix<NatF>;
-    NatF<Nat> layer{Zero{}};
-    auto fixed = wrap_fix<NatF>(layer);
+    NatF<Nat>   layer{Zero{}};
+    auto        fixed     = wrap_fix<NatF>(layer);
     const auto& recovered = unwrap_fix(fixed);
     CHECK(std::holds_alternative<Zero>(recovered));
 }

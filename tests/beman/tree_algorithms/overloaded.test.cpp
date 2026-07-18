@@ -27,7 +27,7 @@ TEST_CASE("overloaded - BasicDispatch", "[tree_algorithms::overloaded]") {
 TEST_CASE("overloaded - DispatchesOnActiveAlternative", "[tree_algorithms::overloaded]") {
     std::variant<int, double, std::string> v;
 
-    v = 3.14;
+    v        = 3.14;
     double d = std::visit(overloaded{
                               [](int) -> double { return 0.0; },
                               [](double x) -> double { return x; },
@@ -36,7 +36,7 @@ TEST_CASE("overloaded - DispatchesOnActiveAlternative", "[tree_algorithms::overl
                           v);
     CHECK(d == 3.14);
 
-    v = std::string{"hello"};
+    v        = std::string{"hello"};
     double s = std::visit(overloaded{
                               [](int) -> double { return 0.0; },
                               [](double) -> double { return 0.0; },

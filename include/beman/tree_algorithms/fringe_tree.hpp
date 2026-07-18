@@ -205,7 +205,7 @@ struct FringeView {
  * sequence is flatten(tree) minus its head; its shape is unspecified.
  * Empty tree yields nullopt. */
 template <typename T>
-auto view_l(const FringeTree<T>& tree) -> std::optional<FringeView<T>> {
+auto view_l(const FringeTree<T>& tree) -> std::optional<FringeView<T> > {
     if (tree.is_empty()) {
         return std::nullopt;
     }
@@ -222,7 +222,7 @@ auto view_l(const FringeTree<T>& tree) -> std::optional<FringeView<T>> {
 
 /** Decompose at the right end: the last element and the rest. */
 template <typename T>
-auto view_r(const FringeTree<T>& tree) -> std::optional<FringeView<T>> {
+auto view_r(const FringeTree<T>& tree) -> std::optional<FringeView<T> > {
     if (tree.is_empty()) {
         return std::nullopt;
     }
@@ -263,7 +263,7 @@ struct FringeBranch {
 };
 
 template <typename T, typename A>
-using FringeTreeF = std::variant<FringeEmpty, FringeLeaf<T>, FringeBranch<A>>;
+using FringeTreeF = std::variant<FringeEmpty, FringeLeaf<T>, FringeBranch<A> >;
 // 0a841db5-7eea-4a8c-bda8-64e9c015a32e end
 
 // ---------------------------------------------------------------------
@@ -278,30 +278,29 @@ template <typename T, typename A>
 struct FringeTreeFFunctorImpl {
     template <typename Fn>
     constexpr auto fmap(this auto&&, Fn&& fn, const FringeTreeF<T, A>& layer) {
-        using B = std::remove_cvref_t<std::invoke_result_t<Fn, const A&>>;
-        return std::visit(
-            overloaded{
-                [](const FringeEmpty&) -> FringeTreeF<T, B> { return FringeEmpty{}; },
-                [](const FringeLeaf<T>& l) -> FringeTreeF<T, B> { return FringeLeaf<T>{l.value}; },
-                [&fn](const FringeBranch<A>& b) -> FringeTreeF<T, B> {
-                    return FringeBranch<B>{std::invoke(fn, b.left), std::invoke(fn, b.right)};
-                },
-            },
-            layer);
+        using B = std::remove_cvref_t<std::invoke_result_t<Fn, const A&> >;
+        return std::visit(overloaded{
+                              [](const FringeEmpty&) -> FringeTreeF<T, B> { return FringeEmpty{}; },
+                              [](const FringeLeaf<T>& l) -> FringeTreeF<T, B> { return FringeLeaf<T>{l.value}; },
+                              [&fn](const FringeBranch<A>& b) -> FringeTreeF<T, B> {
+                                  return FringeBranch<B>{std::invoke(fn, b.left), std::invoke(fn, b.right)};
+                              },
+                          },
+                          layer);
     }
 };
 
 /** Functor map for FringeTreeF<T, A>: the fmap primitive plus the
  * derived operations from the Functor CRTP base. */
 template <typename T, typename A>
-struct FringeTreeFFunctorMap : Functor<FringeTreeFFunctorImpl<T, A>> {
+struct FringeTreeFFunctorMap : Functor<FringeTreeFFunctorImpl<T, A> > {
     using FringeTreeFFunctorImpl<T, A>::fmap;
 };
 
 /** Registers FringeTreeFFunctorMap as the Functor instance for
  * FringeTreeF<T, A>. */
 template <typename T, typename A>
-inline constexpr auto functor_typeclass<FringeTreeF<T, A>> = FringeTreeFFunctorMap<T, A>{};
+inline constexpr auto functor_typeclass<FringeTreeF<T, A> > = FringeTreeFFunctorMap<T, A>{};
 // a692305b-eb87-43fb-98a0-901a582d7ddf end
 
 // ---------------------------------------------------------------------
@@ -332,11 +331,11 @@ inline constexpr FringeTreeProjectFn fringe_tree_project{};
  * construction for every tree unfold_with builds. */
 struct FringeTreeEmbedFn {
     template <typename T>
-    auto operator()(FringeTreeF<T, FringeTree<T>>&& layer) const -> FringeTree<T> {
+    auto operator()(FringeTreeF<T, FringeTree<T> >&& layer) const -> FringeTree<T> {
         return std::visit(overloaded{
                               [](FringeEmpty&&) { return FringeTree<T>::empty(); },
                               [](FringeLeaf<T>&& l) { return FringeTree<T>::leaf(std::move(l.value)); },
-                              [](FringeBranch<FringeTree<T>>&& b) {
+                              [](FringeBranch<FringeTree<T> >&& b) {
                                   return FringeTree<T>::branch(std::move(b.left), std::move(b.right));
                               },
                           },
@@ -376,10 +375,10 @@ inline constexpr FringeTreeLayerFoldMap fringe_tree_layer_fold_map{};
 /** Lookup registrations: the projection keyed on the tree type, the
  * layer fold keyed on the layer type. */
 template <typename T>
-inline constexpr auto project_typeclass<FringeTree<T>> = fringe_tree_project;
+inline constexpr auto project_typeclass<FringeTree<T> > = fringe_tree_project;
 
 template <typename T, typename A>
-inline constexpr auto layer_fold_typeclass<FringeTreeF<T, A>> = fringe_tree_layer_fold_map;
+inline constexpr auto layer_fold_typeclass<FringeTreeF<T, A> > = fringe_tree_layer_fold_map;
 // e6cd1dd3-85b1-4ce2-bf7f-2ab1783d16f8 end
 
 } // namespace beman::tree_algorithms

@@ -48,10 +48,10 @@
 
 using beman::tree_algorithms::fold_map;
 using beman::tree_algorithms::fold_with;
+using beman::tree_algorithms::fringe_tree_project;
 using beman::tree_algorithms::FringeBranch;
 using beman::tree_algorithms::FringeEmpty;
 using beman::tree_algorithms::FringeLeaf;
-using beman::tree_algorithms::fringe_tree_project;
 using beman::tree_algorithms::FringeTree;
 using beman::tree_algorithms::FringeTreeF;
 using beman::tree_algorithms::functor_typeclass;
@@ -200,7 +200,7 @@ int main() {
     auto show   = [](int x) { return std::to_string(x); };
     auto append = [&](const std::string& acc, int v) { return acc + show(v); };
 
-    auto via_foldable = [&](const Tree& t) { return fold_left<std::string>(std::string{}, append, t); };
+    auto via_foldable  = [&](const Tree& t) { return fold_left<std::string>(std::string{}, append, t); };
     auto via_view_walk = [&](Tree t) {
         std::string acc;
         while (auto v = view_l(t)) {
