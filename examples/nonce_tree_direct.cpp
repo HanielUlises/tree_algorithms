@@ -70,6 +70,7 @@ int main() {
     //    4   5
     auto tree = node(1, node(2, leaf(4), leaf(5)), leaf(3));
 
+    // 78958c3f-7ae7-4933-bc32-57c5ec1e8ea2
     // An order-sensitive algebra: "(left value right)" with "." marking
     // an absent child pins shape and traversal order exactly.
     auto shape_algebra = [](const NodeF<std::string>& layer) -> std::string {
@@ -78,6 +79,7 @@ int main() {
     };
 
     auto shape = fold_with<std::string>(shape_algebra, fmap_node, project, tree.get());
+    // 78958c3f-7ae7-4933-bc32-57c5ec1e8ea2 end
     std::println("shape via fold_with:   {}", shape);
 
     // And the dual: build a balanced BST over [0, 7) directly into

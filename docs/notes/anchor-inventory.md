@@ -88,3 +88,11 @@ e4beac7f (fold_map lookup), 8f25579d (ExprLayerFoldMap), and
 ## Snippet gate
 
 `paper_snippets_check` custom target (top-level CMakeLists.txt, ALL) depends on the three anchored examples + tests.{box,fix,expression,functors,binary_tree}; negative-tested (injected syntax error fails the build).
+
+## Essay exhibits (2026-09-07)
+
+Added for the tree-coordination essay `trees-and-transposition-for-29.org`, exhibit E3, which transcludes 04e450a4 (ingredients) followed by this anchor (the fold), pinned by commit.
+
+| Anchor | File | Region | Serves |
+|---|---|---|---|
+| 78958c3f-7ae7-4933-bc32-57c5ec1e8ea2 | examples/nonce_tree_direct.cpp | shape algebra + fold_with call over the unique_ptr tree | essay exhibit E3 (second half) |
