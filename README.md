@@ -62,6 +62,12 @@ Full runnable examples can be found in [`examples/`](examples/):
   structural recursion where they don't.
 * [`sequence_algorithms.cpp`](examples/sequence_algorithms.cpp) — sequence
   algorithms written against a quotient interface that never sees tree shape.
+* [`arena_tree_layout.cpp`](examples/arena_tree_layout.cpp) — the same fold
+  over a `shared_ptr` tree and over a flat arena with no pointers in it;
+  only the projection differs.
+* [`cofree_annotations.cpp`](examples/cofree_annotations.cpp) — annotating
+  every node with its subtree hash to find shared subexpressions, using
+  `fold_with` and no course-of-values scheme.
 
 ## Dependencies
 
