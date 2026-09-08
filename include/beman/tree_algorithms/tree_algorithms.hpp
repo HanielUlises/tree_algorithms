@@ -11,6 +11,7 @@ import beman.tree_algorithms;
 
 #else
 
+    #include <beman/tree_algorithms/arena_tree.hpp>
     #include <beman/tree_algorithms/binary_tree.hpp>
     #include <beman/tree_algorithms/box.hpp>
     #include <beman/tree_algorithms/child_slot.hpp>

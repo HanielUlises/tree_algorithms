@@ -7,6 +7,7 @@ if(BEMAN_TREE_ALGORITHMS_USE_MODULES)
             FILE_SET CXX_MODULES FILES tree_algorithms.cppm
             FILE_SET HEADERS
                 FILES
+                    arena_tree.hpp
                     binary_tree.hpp
                     box.hpp
                     child_slot.hpp
@@ -32,6 +33,7 @@ else()
         PUBLIC
             FILE_SET HEADERS
                 FILES
+                    arena_tree.hpp
                     binary_tree.hpp
                     box.hpp
                     child_slot.hpp
