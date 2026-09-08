@@ -8,6 +8,7 @@ set(ALL_EXAMPLES
     nonce_tree_direct
     search_tree_on_fix
     sequence_algorithms
+    arena_tree_layout
 )
 message("Examples to be built: ${ALL_EXAMPLES}")
 
