@@ -9,6 +9,7 @@ set(ALL_EXAMPLES
     search_tree_on_fix
     sequence_algorithms
     arena_tree_layout
+    cofree_annotations
 )
 message("Examples to be built: ${ALL_EXAMPLES}")
 
