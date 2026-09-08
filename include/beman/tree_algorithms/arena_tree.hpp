@@ -215,6 +215,106 @@ struct ArenaTreeFFunctorMap : Functor<ArenaTreeFFunctorImpl<T, A> > {
 template <typename T, typename A>
 inline constexpr auto functor_typeclass<ArenaTreeF<T, A> > = ArenaTreeFFunctorMap<T, A>{};
 
+// ---------------------------------------------------------------------
+// Projection and embedding: the direct verbs' two ingredients.
+// ---------------------------------------------------------------------
+
+/** Projection for fold_with: exposes one layer of an arena tree,
+ * children as cursors into the arena we already have. Nothing is copied
+ * beyond the one value in the layer, and no allocation happens — the
+ * child handles are two words each, resolved by indexing rather than by
+ * dereference.
+ *
+ * Two overloads, for the two ways a fold enters. The cursor overload is
+ * what the recursion itself calls, because the handles inside a
+ * projected layer are cursors by value. The pointer overload exists
+ * because the typeclass-lookup fold_map bootstraps by taking the
+ * address of whatever it was handed; it simply forwards. */
+struct ArenaTreeProjectFn {
+    template <typename T>
+    auto operator()(ArenaCursor<T> cursor) const -> ArenaTreeF<T, ArenaCursor<T> > {
+        if (cursor.index == ArenaTree<T>::npos) {
+            return ArenaAbsent{};
+        }
+        const auto& node = cursor.tree->at(cursor.index);
+        return ArenaNode<T, ArenaCursor<T> >{node.d_value,
+                                            ArenaCursor<T>{cursor.tree, node.d_left},
+                                            ArenaCursor<T>{cursor.tree, node.d_right}};
+    }
+
+    template <typename T>
+    auto operator()(const ArenaCursor<T>* cursor) const -> ArenaTreeF<T, ArenaCursor<T> > {
+        return (*this)(*cursor);
+    }
+};
+
+inline constexpr ArenaTreeProjectFn arena_tree_project{};
+
+/** Embedding for unfold_with: rebuilds one layer in the arena's own
+ * representation.
+ *
+ * This is the one place the flat layout costs more than a linked one,
+ * and it is worth being plain about. A linked embedding joins two
+ * subtrees by storing two pointers, in constant time. A flat arena has
+ * no such move: the children's nodes must end up contiguous with the
+ * parent's, so joining copies both child arenas and rebases their
+ * indices. Building bottom-up through this embedding is therefore
+ * quadratic in the node count, and unfold_with into an ArenaTree is the
+ * wrong tool for a large tree — build into a linked form and flatten
+ * once, or fill the arena top-down with an explicit builder. Folding
+ * *out* of an arena, which is the direction that matters for the layout
+ * argument, carries none of this cost. */
+struct ArenaTreeEmbedFn {
+    template <typename T>
+    auto operator()(ArenaTreeF<T, ArenaTree<T> >&& layer) const -> ArenaTree<T> {
+        return std::visit(overloaded{
+                              [](ArenaAbsent&&) { return ArenaTree<T>::empty(); },
+                              [](ArenaNode<T, ArenaTree<T> >&& n) {
+                                  return ArenaTree<T>::node(std::move(n.value), std::move(n.left), std::move(n.right));
+                              },
+                          },
+                          std::move(layer));
+    }
+};
+
+inline constexpr ArenaTreeEmbedFn arena_tree_embed{};
+
+// ---------------------------------------------------------------------
+// Elementwise layer fold (for fold_map).
+// ---------------------------------------------------------------------
+
+/** Folds one ArenaTreeF layer elementwise, in order: the left child's
+ * already-folded result, then the mapped node value, then the right
+ * child's result. Absent layers contribute the identity. In-order
+ * traversal is this representation's contract, matching BinaryTree; a
+ * non-commutative combine observes it. */
+struct ArenaTreeLayerFoldMap {
+    template <typename MapFn, typename Combine, typename Result, typename T>
+    constexpr auto operator()(const MapFn&                 map_fn,
+                              const Combine&               combine,
+                              const Result&                identity,
+                              const ArenaTreeF<T, Result>& layer) const -> Result {
+        return std::visit(overloaded{
+                              [&](const ArenaAbsent&) -> Result { return identity; },
+                              [&](const ArenaNode<T, Result>& n) -> Result {
+                                  return combine(combine(n.left, map_fn(n.value)), n.right);
+                              },
+                          },
+                          layer);
+    }
+};
+
+inline constexpr ArenaTreeLayerFoldMap arena_tree_layer_fold_map{};
+
+/** Lookup registrations: the projection keyed on the cursor, which is
+ * this representation's tree handle, and the layer fold keyed on the
+ * layer type. */
+template <typename T>
+inline constexpr auto project_typeclass<ArenaCursor<T> > = arena_tree_project;
+
+template <typename T, typename A>
+inline constexpr auto layer_fold_typeclass<ArenaTreeF<T, A> > = arena_tree_layer_fold_map;
+
 } // namespace beman::tree_algorithms
 
 #endif // BEMAN_TREE_ALGORITHMS_USE_MODULES() &&
